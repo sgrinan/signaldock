@@ -1,6 +1,10 @@
 package endpoint
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
 
 func TestParseURL(t *testing.T) {
 	tests := []struct {
@@ -59,6 +63,47 @@ func TestParseURL(t *testing.T) {
 
 			if err.Error() != tt.wantErr {
 				t.Fatalf("ParseURL() error = %q, want %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetStatusCode(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+	}{
+		{
+			name:       "status code 200",
+			statusCode: http.StatusOK,
+		},
+		{
+			name:       "status code 503",
+			statusCode: http.StatusServiceUnavailable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+			})
+
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			parsedURL, err := ParseURL(server.URL)
+			if err != nil {
+				t.Fatalf("ParseURL() unexpected error = %v", err)
+			}
+
+			statusCode, err := GetStatusCode(parsedURL)
+			if err != nil {
+				t.Fatalf("GetStatusCode() unexpected error = %v", err)
+			}
+
+			if statusCode != tt.statusCode {
+				t.Errorf("GetStatusCode() = %d, want %d", statusCode, tt.statusCode)
 			}
 		})
 	}

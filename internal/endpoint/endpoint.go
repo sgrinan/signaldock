@@ -3,7 +3,9 @@ package endpoint
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
+	"time"
 )
 
 func ParseURL(rawURL string) (*url.URL, error) {
@@ -21,4 +23,19 @@ func ParseURL(rawURL string) (*url.URL, error) {
 	}
 
 	return parsedURL, nil
+}
+
+func GetStatusCode(parsedURL *url.URL) (int, error) {
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get(parsedURL.String())
+	if err != nil {
+		return 0, fmt.Errorf("GetStatusCode: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	return resp.StatusCode, nil
 }
