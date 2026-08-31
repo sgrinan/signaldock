@@ -108,3 +108,25 @@ func TestGetStatusCode(t *testing.T) {
 		})
 	}
 }
+
+func TestGetStatusCodeEndpointUnreachable(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	server := httptest.NewServer(handler)
+
+	parsedURL, err := ParseURL(server.URL)
+	if err != nil {
+		t.Fatalf("ParseURL() unexpected error = %v", err)
+	}
+
+	server.Close()
+
+	statusCode, err := GetStatusCode(parsedURL)
+	if err == nil {
+		t.Fatal("GetStatusCode() error = nil, want error")
+	}
+
+	if statusCode != 0 {
+		t.Errorf("GetStatusCode() = %d, want 0", statusCode)
+	}
+}
