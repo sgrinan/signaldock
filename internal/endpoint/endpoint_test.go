@@ -111,7 +111,6 @@ func TestGetStatusCode(t *testing.T) {
 
 func TestGetStatusCodeEndpointUnreachable(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-
 	server := httptest.NewServer(handler)
 
 	parsedURL, err := ParseURL(server.URL)
@@ -128,5 +127,54 @@ func TestGetStatusCodeEndpointUnreachable(t *testing.T) {
 
 	if statusCode != 0 {
 		t.Errorf("GetStatusCode() = %d, want 0", statusCode)
+	}
+}
+
+func TestAddValidEndpoint(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	store := Store{}
+
+	endpoint, statusCode, err := store.AddEndpoint(server.URL)
+	if err != nil {
+		t.Fatalf("AddEndpoint() unexpected error = %v", err)
+	}
+
+	if endpoint.URL != server.URL {
+		t.Errorf("AddEndpoint() endpoint.URL = %q, want %q", endpoint.URL, server.URL)
+	}
+
+	if statusCode != http.StatusOK {
+		t.Errorf("AddEndpoint() statusCode = %d, want %d", statusCode, http.StatusOK)
+	}
+
+	if len(store.endpoints) != 1 {
+		t.Errorf("AddEndpoint() store size = %d, want 1", len(store.endpoints))
+	}
+}
+
+func TestAddInvalidEndpoint(t *testing.T) {
+	store := Store{}
+
+	endpoint, statusCode, err := store.AddEndpoint("example.com")
+	if err == nil {
+		t.Fatalf("AddEndpoint() error = nil, want error")
+	}
+
+	if endpoint != (Endpoint{}) {
+		t.Errorf("AddEndpoint() endpoint = %+v, want empty Endpoint", endpoint)
+	}
+
+	if statusCode != 0 {
+		t.Errorf("AddEndpoint() statusCode = %d, want 0", statusCode)
+	}
+
+	if len(store.endpoints) != 0 {
+		t.Errorf("AddEndpoint() store size = %d, want 0", len(store.endpoints))
 	}
 }
