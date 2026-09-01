@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+type Endpoint struct {
+	URL string
+}
+
+type Store struct {
+	endpoints []Endpoint
+}
+
 func ParseURL(rawURL string) (*url.URL, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
@@ -40,19 +48,7 @@ func GetStatusCode(parsedURL *url.URL) (int, error) {
 	return resp.StatusCode, nil
 }
 
-type Endpoint struct {
-	URL string
-}
-
-type Store struct {
-	endpoints []Endpoint
-}
-
-func (store *Store) Add(endpoint Endpoint) {
-	store.endpoints = append(store.endpoints, endpoint)
-}
-
-func (store *Store) AddEndpoint(rawURL string) (Endpoint, int, error) {
+func (store *Store) Add(rawURL string) (Endpoint, int, error) {
 	parsedURL, err := ParseURL(rawURL)
 	if err != nil {
 		return Endpoint{}, 0, err
@@ -64,11 +60,15 @@ func (store *Store) AddEndpoint(rawURL string) (Endpoint, int, error) {
 
 	statusCode, err := GetStatusCode(parsedURL)
 	if err != nil {
-		store.Add(endpoint)
+		store.endpoints = append(store.endpoints, endpoint)
 		return endpoint, 0, err
 	}
 
-	store.Add(endpoint)
+	store.endpoints = append(store.endpoints, endpoint)
 
 	return endpoint, statusCode, nil
+}
+
+func (store *Store) List() []Endpoint {
+	return store.endpoints
 }
