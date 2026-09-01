@@ -10,19 +10,28 @@ func TestParseURL(t *testing.T) {
 	tests := []struct {
 		name    string
 		url     string
+		wantURL string
 		wantErr string
 	}{
 		{
-			name: "valid http URL",
-			url:  "http://example.com/",
+			name:    "valid URL without root path",
+			url:     "https://example.com",
+			wantURL: "https://example.com/",
 		},
 		{
-			name: "valid https URL",
-			url:  "https://example.com/",
+			name:    "valid HTTPS URL with root path",
+			url:     "https://example.com/",
+			wantURL: "https://example.com/",
 		},
 		{
-			name: "valid URL with path",
-			url:  "https://example.com/health",
+			name:    "valid HTTP URL with root path",
+			url:     "http://example.com/",
+			wantURL: "http://example.com/",
+		},
+		{
+			name:    "valid URL with path",
+			url:     "https://example.com/health",
+			wantURL: "https://example.com/health",
 		},
 		{
 			name:    "missing scheme",
@@ -48,21 +57,26 @@ func TestParseURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseURL(tt.url)
+			parsedURL, err := ParseURL(tt.url)
 
-			if tt.wantErr == "" {
-				if err != nil {
-					t.Fatalf("ParseURL() unexpected error = %v", err)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("ParseURL() error = nil, want %q", tt.wantErr)
 				}
+
+				if err.Error() != tt.wantErr {
+					t.Fatalf("ParseURL() error = %q, want %q", err.Error(), tt.wantErr)
+				}
+
 				return
 			}
 
-			if err == nil {
-				t.Fatalf("ParseURL() error = nil, want %q", tt.wantErr)
+			if err != nil {
+				t.Fatalf("ParseURL() unexpected error = %v", err)
 			}
 
-			if err.Error() != tt.wantErr {
-				t.Fatalf("ParseURL() error = %q, want %q", err.Error(), tt.wantErr)
+			if parsedURL.String() != tt.wantURL {
+				t.Errorf("ParseURL() = %q, want %q", parsedURL.String(), tt.wantURL)
 			}
 		})
 	}
@@ -74,11 +88,11 @@ func TestGetStatusCode(t *testing.T) {
 		statusCode int
 	}{
 		{
-			name:       "return status 200",
+			name:       "returns status 200",
 			statusCode: http.StatusOK,
 		},
 		{
-			name:       "return status 503",
+			name:       "returns status 503",
 			statusCode: http.StatusServiceUnavailable,
 		},
 	}
@@ -110,8 +124,9 @@ func TestGetStatusCode(t *testing.T) {
 }
 
 func TestGetStatusCodeEndpointUnreachable(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
+	)
 
 	parsedURL, err := ParseURL(server.URL)
 	if err != nil {
@@ -131,22 +146,23 @@ func TestGetStatusCodeEndpointUnreachable(t *testing.T) {
 }
 
 func TestAddValidEndpoint(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
 	defer server.Close()
 
 	store := Store{}
+	wantURL := server.URL + "/"
 
 	endpoint, statusCode, err := store.Add(server.URL)
 	if err != nil {
 		t.Fatalf("Add() unexpected error = %v", err)
 	}
 
-	if endpoint.URL != server.URL {
-		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, server.URL)
+	if endpoint.URL != wantURL {
+		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, wantURL)
 	}
 
 	if statusCode != http.StatusOK {
@@ -180,8 +196,9 @@ func TestAddInvalidEndpoint(t *testing.T) {
 }
 
 func TestAddUnreachableEndpoint(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
+	)
 
 	rawURL := server.URL
 	server.Close()
@@ -193,8 +210,82 @@ func TestAddUnreachableEndpoint(t *testing.T) {
 		t.Fatal("Add() error = nil, want error")
 	}
 
-	if endpoint.URL != rawURL {
-		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, rawURL)
+	wantURL := rawURL + "/"
+	if endpoint.URL != wantURL {
+		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, wantURL)
+	}
+
+	if statusCode != 0 {
+		t.Errorf("Add() statusCode = %d, want 0", statusCode)
+	}
+
+	if len(store.endpoints) != 1 {
+		t.Errorf("Add() store size = %d, want 1", len(store.endpoints))
+	}
+}
+
+func TestExists(t *testing.T) {
+	store := Store{
+		endpoints: []Endpoint{
+			{URL: "https://first.com/"},
+			{URL: "https://second.com/"},
+		},
+	}
+
+	tests := []struct {
+		name string
+		url  string
+		want bool
+	}{
+		{
+			name: "existing endpoint",
+			url:  "https://second.com/",
+			want: true,
+		},
+		{
+			name: "missing endpoint",
+			url:  "https://third.com/",
+			want: false,
+		},
+		{
+			name: "missing alternative endpoint",
+			url:  "https://www.second.com/",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exists := store.Exists(tt.url)
+			if exists != tt.want {
+				t.Errorf("Exists(%q) = %v, want %v", tt.url, exists, tt.want)
+			}
+		})
+	}
+}
+
+func TestAddDuplicateEndpoint(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
+	defer server.Close()
+
+	store := Store{}
+
+	_, _, err := store.Add(server.URL)
+	if err != nil {
+		t.Fatalf("Add() unexpected error = %v", err)
+	}
+
+	endpoint, statusCode, err := store.Add(server.URL + "/")
+	if err == nil {
+		t.Fatal("Add() error = nil, want error")
+	}
+
+	if endpoint != (Endpoint{}) {
+		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
 	}
 
 	if statusCode != 0 {

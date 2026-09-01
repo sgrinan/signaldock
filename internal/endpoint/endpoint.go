@@ -30,6 +30,10 @@ func ParseURL(rawURL string) (*url.URL, error) {
 		return nil, errors.New("URL host is required")
 	}
 
+	if parsedURL.Path == "" {
+		parsedURL.Path = "/"
+	}
+
 	return parsedURL, nil
 }
 
@@ -54,8 +58,12 @@ func (store *Store) Add(rawURL string) (Endpoint, int, error) {
 		return Endpoint{}, 0, err
 	}
 
+	if store.Exists(parsedURL.String()) {
+		return Endpoint{}, 0, errors.New("endpoint already exists")
+	}
+
 	endpoint := Endpoint{
-		URL: rawURL,
+		URL: parsedURL.String(),
 	}
 
 	statusCode, err := GetStatusCode(parsedURL)
@@ -71,4 +79,13 @@ func (store *Store) Add(rawURL string) (Endpoint, int, error) {
 
 func (store *Store) List() []Endpoint {
 	return store.endpoints
+}
+
+func (store *Store) Exists(url string) bool {
+	for _, endpoint := range store.endpoints {
+		if endpoint.URL == url {
+			return true
+		}
+	}
+	return false
 }
