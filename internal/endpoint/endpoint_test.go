@@ -163,7 +163,7 @@ func TestAddInvalidEndpoint(t *testing.T) {
 
 	endpoint, statusCode, err := store.Add("example.com")
 	if err == nil {
-		t.Fatalf("Add() error = nil, want error")
+		t.Fatal("Add() error = nil, want error")
 	}
 
 	if endpoint != (Endpoint{}) {
