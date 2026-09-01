@@ -1,6 +1,7 @@
 package web
 
 import (
+	"embed"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -8,10 +9,13 @@ import (
 	"github.com/sgrinan/signaldock/internal/endpoint"
 )
 
+//go:embed templates/index.html
+var templates embed.FS
+
 func NewHandler(store *endpoint.Store) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
-	tmpl, err := template.ParseFiles("/home/rat/projects/signaldock/internal/web/templates/index.html")
+	tmpl, err := template.ParseFS(templates, "templates/index.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
 	}
