@@ -5,10 +5,19 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
+	"uuid"
+)
+
+var (
+	ErrUnsupportedScheme = errors.New("unsupported URL scheme")
+	ErrHostRequired      = errors.New("URL host is required")
+	ErrEndpointExists    = errors.New("endpoint already exists")
 )
 
 type Endpoint struct {
+	ID  uuid.UUID
 	URL string
 }
 
@@ -17,17 +26,19 @@ type Store struct {
 }
 
 func ParseURL(rawURL string) (*url.URL, error) {
+	rawURL = strings.TrimSpace(rawURL)
+
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("ParseURL: %w", err)
 	}
 
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return nil, errors.New("unsupported URL scheme")
+		return nil, ErrUnsupportedScheme
 	}
 
 	if parsedURL.Host == "" {
-		return nil, errors.New("URL host is required")
+		return nil, ErrHostRequired
 	}
 
 	if parsedURL.Path == "" {
@@ -59,11 +70,14 @@ func (store *Store) Add(rawURL string) (Endpoint, int, error) {
 	}
 
 	if store.Exists(parsedURL.String()) {
-		return Endpoint{}, 0, errors.New("endpoint already exists")
+		return Endpoint{}, 0, ErrEndpointExists
 	}
+
+	id := uuid.NewV7()
 
 	endpoint := Endpoint{
 		URL: parsedURL.String(),
+		ID:  id,
 	}
 
 	statusCode, err := GetStatusCode(parsedURL)
@@ -88,4 +102,13 @@ func (store *Store) Exists(url string) bool {
 		}
 	}
 	return false
+}
+
+func (store *Store) GetByID(id uuid.UUID) (Endpoint, bool) {
+	for _, endpoint := range store.endpoints {
+		if endpoint.ID == id {
+			return endpoint, true
+		}
+	}
+	return Endpoint{}, false
 }

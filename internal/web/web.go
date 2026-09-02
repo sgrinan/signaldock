@@ -2,26 +2,48 @@ package web
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
+	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/endpoint"
 )
 
-//go:embed templates/index.html
+//go:embed templates/*.html
 var templates embed.FS
+
+type PageData struct {
+	Endpoints []endpoint.Endpoint
+	Error     string
+}
 
 func NewHandler(store *endpoint.Store) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
-	tmpl, err := template.ParseFS(templates, "templates/index.html")
+	tmpl, err := template.ParseFS(templates, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
 	}
 
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		if err := tmpl.Execute(w, store.List()); err != nil {
+		result := r.URL.Query().Get("result")
+
+		pageData := PageData{
+			Endpoints: store.List(),
+		}
+
+		switch result {
+		case "unreachable":
+			pageData.Error = "Endpoint was added, but it is currently unreachable"
+		case "duplicate":
+			pageData.Error = "Endpoint already exists"
+		case "invalid":
+			pageData.Error = "Enter a valid HTTP or HTTPS URL"
+		}
+
+		if err := tmpl.ExecuteTemplate(w, "index.html", pageData); err != nil {
 			http.Error(w, "failed to render page", http.StatusInternalServerError)
 		}
 	})
@@ -29,12 +51,49 @@ func NewHandler(store *endpoint.Store) (*http.ServeMux, error) {
 	mux.HandleFunc("POST /endpoints", func(w http.ResponseWriter, r *http.Request) {
 		rawURL := r.FormValue("url")
 
-		_, _, err := store.Add(rawURL)
+		added, _, err := store.Add(rawURL)
+		switch {
+		case err == nil:
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+
+		case errors.Is(err, endpoint.ErrEndpointExists):
+			http.Redirect(w, r, "/?result=duplicate", http.StatusSeeOther)
+			return
+
+		case errors.Is(err, endpoint.ErrUnsupportedScheme),
+			errors.Is(err, endpoint.ErrHostRequired):
+			http.Redirect(w, r, "/?result=invalid", http.StatusSeeOther)
+			return
+
+		case added != (endpoint.Endpoint{}):
+			http.Redirect(w, r, "/?result=unreachable", http.StatusSeeOther)
+			return
+
+		default:
+			http.Error(w, "failed to add endpoint", http.StatusInternalServerError)
+			return
+		}
+	})
+
+	mux.HandleFunc("GET /endpoints/{id}", func(w http.ResponseWriter, r *http.Request) {
+		rawID := r.PathValue("id")
+
+		id, err := uuid.Parse(rawID)
 		if err != nil {
+			http.Error(w, "invalid endpoint ID", http.StatusBadRequest)
 			return
 		}
 
-		http.Redirect(w, r, "GET /", http.StatusSeeOther)
+		endpoint, found := store.GetByID(id)
+		if !found {
+			http.Error(w, "endpoint not found", http.StatusNotFound)
+			return
+		}
+
+		if err := tmpl.ExecuteTemplate(w, "endpoint.html", endpoint); err != nil {
+			http.Error(w, "failed to render page", http.StatusInternalServerError)
+		}
 	})
 
 	return mux, nil

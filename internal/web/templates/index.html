@@ -7,6 +7,10 @@
 
 <h2>Endpoints</h2>
 
-{{ range . }}
-    <p>{{ .URL }}</p>
+{{ range .Endpoints }}
+    <p>{{ .URL }} <a href="/endpoints/{{ .ID }}">View</a></p>
+{{ end }}
+
+{{ if .Error }}
+    <p>{{ .Error }}</p>
 {{ end }}
