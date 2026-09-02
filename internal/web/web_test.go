@@ -1,6 +1,8 @@
 package web
 
 import (
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,7 +28,8 @@ func TestGetIndex(t *testing.T) {
 		t.Fatalf("Add() unexpected error = %v", err)
 	}
 
-	handler, err := NewHandler(&store)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler, err := NewHandler(&store, logger)
 	if err != nil {
 		t.Fatalf("NewHandler() unexpected error = %v", err)
 	}
@@ -55,7 +58,8 @@ func TestPostEndpoint(t *testing.T) {
 
 	store := endpoint.Store{}
 
-	handler, err := NewHandler(&store)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler, err := NewHandler(&store, logger)
 	if err != nil {
 		t.Fatalf("NewHandler() unexpected error = %v", err)
 	}
@@ -106,7 +110,8 @@ func TestGetEndpoint(t *testing.T) {
 		t.Fatalf("Add() unexpected error = %v", err)
 	}
 
-	handler, err := NewHandler(&store)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler, err := NewHandler(&store, logger)
 	if err != nil {
 		t.Fatalf("NewHandler() unexpected error = %v", err)
 	}

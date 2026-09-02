@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"uuid"
 
@@ -19,7 +20,7 @@ type PageData struct {
 	Error     string
 }
 
-func NewHandler(store *endpoint.Store) (*http.ServeMux, error) {
+func NewHandler(store *endpoint.Store, logger *slog.Logger) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	tmpl, err := template.ParseFS(templates, "templates/*.html")
@@ -44,7 +45,9 @@ func NewHandler(store *endpoint.Store) (*http.ServeMux, error) {
 		}
 
 		if err := tmpl.ExecuteTemplate(w, "index.html", pageData); err != nil {
+			logger.Error("failed to render template", "template", "index.html", "error", err)
 			http.Error(w, "failed to render page", http.StatusInternalServerError)
+			return
 		}
 	})
 
@@ -67,10 +70,12 @@ func NewHandler(store *endpoint.Store) (*http.ServeMux, error) {
 			return
 
 		case added != (endpoint.Endpoint{}):
+			logger.Warn("endpoint initial check failed", "url", added.URL, "error", err)
 			http.Redirect(w, r, "/?result=unreachable", http.StatusSeeOther)
 			return
 
 		default:
+			logger.Error("failed to add endpoint", "url", rawURL, "error", err)
 			http.Error(w, "failed to add endpoint", http.StatusInternalServerError)
 			return
 		}
@@ -92,7 +97,9 @@ func NewHandler(store *endpoint.Store) (*http.ServeMux, error) {
 		}
 
 		if err := tmpl.ExecuteTemplate(w, "endpoint.html", endpoint); err != nil {
+			logger.Error("failed to render template", "template", "endpoint.html", "error", err)
 			http.Error(w, "failed to render page", http.StatusInternalServerError)
+			return
 		}
 	})
 

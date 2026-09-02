@@ -1,8 +1,9 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/sgrinan/signaldock/internal/endpoint"
 	"github.com/sgrinan/signaldock/internal/web"
@@ -11,16 +12,19 @@ import (
 const port = "8080"
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	logger.Info("starting SignalDock", "port", port)
+
 	store := endpoint.Store{}
 
-	store.Add("https://example.com/")
-
-	handler, err := web.NewHandler(&store)
+	handler, err := web.NewHandler(&store, logger)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to create HTTP handler", "error", err)
+		os.Exit(1)
 	}
 
 	if err := http.ListenAndServe(":"+port, handler); err != nil {
-		log.Fatal(err)
+		logger.Error("HTTP server stopped", "error", err)
+		os.Exit(1)
 	}
 }

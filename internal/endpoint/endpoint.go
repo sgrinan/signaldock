@@ -76,8 +76,8 @@ func (store *Store) Add(rawURL string) (Endpoint, int, error) {
 	id := uuid.NewV7()
 
 	endpoint := Endpoint{
-		URL: parsedURL.String(),
 		ID:  id,
+		URL: parsedURL.String(),
 	}
 
 	statusCode, err := GetStatusCode(parsedURL)
