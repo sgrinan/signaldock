@@ -212,6 +212,7 @@ func TestAddUnreachableEndpoint(t *testing.T) {
 	}
 
 	wantURL := rawURL + "/"
+
 	if endpoint.URL != wantURL {
 		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, wantURL)
 	}
@@ -334,4 +335,46 @@ func TestGetByID(t *testing.T) {
 	if endpoint != (Endpoint{}) {
 		t.Errorf("GetByID() endpoint = %+v, want empty Endpoint", endpoint)
 	}
+}
+
+func TestRemoveByID(t *testing.T) {
+	t.Run("existing endpoint", func(t *testing.T) {
+		id := uuid.NewV7()
+
+		store := Store{
+			endpoints: []Endpoint{
+				{URL: "https://first.com/"},
+				{URL: "https://second.com/", ID: id},
+			},
+		}
+
+		removed := store.RemoveByID(id)
+
+		if !removed {
+			t.Error("RemoveByID() = false, want true")
+		}
+
+		if len(store.endpoints) != 1 {
+			t.Errorf("RemoveByID() store size = %d, want 1", len(store.endpoints))
+		}
+	})
+
+	t.Run("missing endpoint", func(t *testing.T) {
+		store := Store{
+			endpoints: []Endpoint{
+				{URL: "https://first.com/"},
+			},
+		}
+
+		missingID := uuid.NewV7()
+		removed := store.RemoveByID(missingID)
+
+		if removed {
+			t.Error("RemoveByID() = true, want false")
+		}
+
+		if len(store.endpoints) != 1 {
+			t.Errorf("RemoveByID() store size = %d, want 1", len(store.endpoints))
+		}
+	})
 }

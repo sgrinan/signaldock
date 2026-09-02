@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"uuid"
@@ -111,4 +112,14 @@ func (store *Store) GetByID(id uuid.UUID) (Endpoint, bool) {
 		}
 	}
 	return Endpoint{}, false
+}
+
+func (store *Store) RemoveByID(id uuid.UUID) bool {
+	for i, endpoint := range store.endpoints {
+		if endpoint.ID == id {
+			store.endpoints = slices.Delete(store.endpoints, i, i+1)
+			return true
+		}
+	}
+	return false
 }

@@ -67,16 +67,8 @@ func TestPostEndpoint(t *testing.T) {
 	form := url.Values{}
 	form.Set("url", server.URL)
 
-	request := httptest.NewRequest(
-		http.MethodPost,
-		"/endpoints",
-		strings.NewReader(form.Encode()),
-	)
-
-	request.Header.Set(
-		"Content-Type",
-		"application/x-www-form-urlencoded",
-	)
+	request := httptest.NewRequest(http.MethodPost, "/endpoints", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	recorder := httptest.NewRecorder()
 
@@ -151,6 +143,71 @@ func TestGetEndpoint(t *testing.T) {
 
 		if recorder.Code != http.StatusNotFound {
 			t.Errorf("GET /endpoints/{id} status = %d, want %d", recorder.Code, http.StatusNotFound)
+		}
+	})
+}
+
+func TestPostDeleteEndpoint(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
+	defer server.Close()
+
+	store := endpoint.Store{}
+
+	added, _, err := store.Add(server.URL)
+	if err != nil {
+		t.Fatalf("Add() unexpected error = %v", err)
+	}
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler, err := NewHandler(&store, logger)
+	if err != nil {
+		t.Fatalf("NewHandler() unexpected error = %v", err)
+	}
+
+	t.Run("existing endpoint", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodPost, "/endpoints/"+added.ID.String()+"/delete", nil)
+		recorder := httptest.NewRecorder()
+
+		handler.ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusSeeOther {
+			t.Errorf("POST /endpoints/{id}/delete status = %d, want %d", recorder.Code, http.StatusSeeOther)
+		}
+
+		if location := recorder.Header().Get("Location"); location != "/" {
+			t.Errorf("POST /endpoints/{id}/delete Location = %q, want %q", location, "/")
+		}
+
+		if len(store.List()) != 0 {
+			t.Errorf("POST /endpoints/{id}/delete store size = %d, want 0", len(store.List()))
+		}
+	})
+
+	t.Run("invalid ID", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodPost, "/endpoints/not-a-uuid/delete", nil)
+		recorder := httptest.NewRecorder()
+
+		handler.ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusBadRequest {
+			t.Errorf("POST /endpoints/not-a-uuid/delete status = %d, want %d", recorder.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("endpoint not found", func(t *testing.T) {
+		missingID := uuid.NewV7()
+
+		request := httptest.NewRequest(http.MethodPost, "/endpoints/"+missingID.String()+"/delete", nil)
+		recorder := httptest.NewRecorder()
+
+		handler.ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusNotFound {
+			t.Errorf("POST /endpoints/{id}/delete status = %d, want %d", recorder.Code, http.StatusNotFound)
 		}
 	})
 }

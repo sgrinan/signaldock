@@ -103,5 +103,23 @@ func NewHandler(store *endpoint.Store, logger *slog.Logger) (*http.ServeMux, err
 		}
 	})
 
+	mux.HandleFunc("POST /endpoints/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
+		rawID := r.PathValue("id")
+
+		id, err := uuid.Parse(rawID)
+		if err != nil {
+			http.Error(w, "invalid endpoint ID", http.StatusBadRequest)
+			return
+		}
+
+		removed := store.RemoveByID(id)
+		if !removed {
+			http.Error(w, "endpoint not found", http.StatusNotFound)
+			return
+		}
+
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	})
+
 	return mux, nil
 }
