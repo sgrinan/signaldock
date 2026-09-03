@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/endpoint"
+	"github.com/sgrinan/signaldock/internal/probe"
 )
 
 //go:embed templates/*.html
@@ -135,7 +136,7 @@ func handlePostEndpoint(store EndpointStore, logger *slog.Logger) http.HandlerFu
 			http.Redirect(w, r, "/?result=invalid", http.StatusSeeOther)
 			return
 
-		case errors.Is(err, endpoint.ErrUnsafeHost):
+		case errors.Is(err, probe.ErrUnsafeHost):
 			http.Redirect(w, r, "/?result=unsafe", http.StatusSeeOther)
 			return
 
