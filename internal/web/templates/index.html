@@ -3,6 +3,7 @@
 <form method="POST" action="/endpoints">
     <input type="url" id="url" name="url" required>
     <button type="submit">Add</button>
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
 </form>
 
 <h2>Endpoints</h2>
@@ -14,6 +15,7 @@
         
         <form method="POST" action="/endpoints/{{ .ID }}/delete">
             <button type="submit">Remove</button>
+            <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
         </form>
     </p>
 {{ end }}

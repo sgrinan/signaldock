@@ -1,7 +1,9 @@
 package web
 
 import (
+	"crypto/rand"
 	"embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html/template"
@@ -18,6 +20,7 @@ var templates embed.FS
 type PageData struct {
 	Endpoints []endpoint.Endpoint
 	Error     string
+	CSRFToken string
 }
 
 type EndpointStore interface {
@@ -27,20 +30,57 @@ type EndpointStore interface {
 	RemoveByID(uuid.UUID) bool
 }
 
-func NewHandler(store EndpointStore, logger *slog.Logger) (*http.ServeMux, error) {
-	mux := http.NewServeMux()
+func generateCSRFToken() string {
+	key := make([]byte, 32)
+	rand.Read(key)
 
+	return hex.EncodeToString(key)
+}
+
+func validateCSRF(r *http.Request) bool {
+	cookie, err := r.Cookie("csrf_token")
+	if err != nil {
+		return false
+	}
+
+	formToken := r.FormValue("csrf_token")
+
+	return cookie.Value != "" && formToken != "" && cookie.Value == formToken
+}
+
+func NewHandler(store EndpointStore, logger *slog.Logger) (*http.ServeMux, error) {
 	tmpl, err := template.ParseFS(templates, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
 	}
 
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /", handleGetIndex(store, tmpl, logger))
+	mux.HandleFunc("POST /endpoints", handlePostEndpoint(store, logger))
+	mux.HandleFunc("GET /endpoints/{id}", handleGetEndpoint(store, tmpl, logger))
+	mux.HandleFunc("POST /endpoints/{id}/delete", handleDeleteEndpoint(store))
+
+	return mux, nil
+}
+
+func handleGetIndex(store EndpointStore, tmpl *template.Template, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		result := r.URL.Query().Get("result")
+
+		csrfToken := generateCSRFToken()
 
 		pageData := PageData{
 			Endpoints: store.List(),
+			CSRFToken: csrfToken,
 		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "csrf_token",
+			Value:    csrfToken,
+			Path:     "/",
+			SameSite: http.SameSiteStrictMode,
+		})
 
 		switch result {
 		case "unreachable":
@@ -58,9 +98,16 @@ func NewHandler(store EndpointStore, logger *slog.Logger) (*http.ServeMux, error
 			http.Error(w, "failed to render page", http.StatusInternalServerError)
 			return
 		}
-	})
+	}
+}
 
-	mux.HandleFunc("POST /endpoints", func(w http.ResponseWriter, r *http.Request) {
+func handlePostEndpoint(store EndpointStore, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !validateCSRF(r) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
 		rawURL := r.FormValue("url")
 
 		added, _, err := store.Add(rawURL)
@@ -92,9 +139,11 @@ func NewHandler(store EndpointStore, logger *slog.Logger) (*http.ServeMux, error
 			http.Error(w, "failed to add endpoint", http.StatusInternalServerError)
 			return
 		}
-	})
+	}
+}
 
-	mux.HandleFunc("GET /endpoints/{id}", func(w http.ResponseWriter, r *http.Request) {
+func handleGetEndpoint(store EndpointStore, tmpl *template.Template, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		rawID := r.PathValue("id")
 
 		id, err := uuid.Parse(rawID)
@@ -114,9 +163,16 @@ func NewHandler(store EndpointStore, logger *slog.Logger) (*http.ServeMux, error
 			http.Error(w, "failed to render page", http.StatusInternalServerError)
 			return
 		}
-	})
+	}
+}
 
-	mux.HandleFunc("POST /endpoints/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
+func handleDeleteEndpoint(store EndpointStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !validateCSRF(r) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
 		rawID := r.PathValue("id")
 
 		id, err := uuid.Parse(rawID)
@@ -132,7 +188,5 @@ func NewHandler(store EndpointStore, logger *slog.Logger) (*http.ServeMux, error
 		}
 
 		http.Redirect(w, r, "/", http.StatusSeeOther)
-	})
-
-	return mux, nil
+	}
 }
