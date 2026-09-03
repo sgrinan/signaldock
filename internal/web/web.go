@@ -20,7 +20,14 @@ type PageData struct {
 	Error     string
 }
 
-func NewHandler(store *endpoint.Store, logger *slog.Logger) (*http.ServeMux, error) {
+type EndpointStore interface {
+	Add(string) (endpoint.Endpoint, int, error)
+	List() []endpoint.Endpoint
+	GetByID(uuid.UUID) (endpoint.Endpoint, bool)
+	RemoveByID(uuid.UUID) bool
+}
+
+func NewHandler(store EndpointStore, logger *slog.Logger) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	tmpl, err := template.ParseFS(templates, "templates/*.html")
@@ -42,6 +49,8 @@ func NewHandler(store *endpoint.Store, logger *slog.Logger) (*http.ServeMux, err
 			pageData.Error = "Endpoint already exists"
 		case "invalid":
 			pageData.Error = "Enter a valid HTTP or HTTPS URL"
+		case "unsafe":
+			pageData.Error = "Private or unsafe network destinations are not allowed"
 		}
 
 		if err := tmpl.ExecuteTemplate(w, "index.html", pageData); err != nil {
@@ -67,6 +76,10 @@ func NewHandler(store *endpoint.Store, logger *slog.Logger) (*http.ServeMux, err
 		case errors.Is(err, endpoint.ErrUnsupportedScheme),
 			errors.Is(err, endpoint.ErrHostRequired):
 			http.Redirect(w, r, "/?result=invalid", http.StatusSeeOther)
+			return
+
+		case errors.Is(err, endpoint.ErrUnsafeHost):
+			http.Redirect(w, r, "/?result=unsafe", http.StatusSeeOther)
 			return
 
 		case added != (endpoint.Endpoint{}):

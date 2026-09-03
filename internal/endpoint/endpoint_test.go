@@ -4,9 +4,84 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
+	"net/url"
 	"testing"
 	"uuid"
 )
+
+func TestValidateHost(t *testing.T) {
+	tests := []struct {
+		name    string
+		host    string
+		wantErr error
+	}{
+		{
+			name: "public IPv4 Cloudflare",
+			host: "1.1.1.1",
+		},
+		{
+			name: "public IPv4 Google",
+			host: "8.8.8.8",
+		},
+		{
+			name:    "loopback IPv4",
+			host:    "127.0.0.1",
+			wantErr: ErrUnsafeHost,
+		},
+		{
+			name:    "localhost hostname",
+			host:    "localhost",
+			wantErr: ErrUnsafeHost,
+		},
+		{
+			name:    "private IPv4 10 range",
+			host:    "10.0.0.1",
+			wantErr: ErrUnsafeHost,
+		},
+		{
+			name:    "private IPv4 192 range",
+			host:    "192.168.1.1",
+			wantErr: ErrUnsafeHost,
+		},
+		{
+			name:    "link-local metadata IPv4",
+			host:    "169.254.169.254",
+			wantErr: ErrUnsafeHost,
+		},
+		{
+			name:    "unspecified IPv4",
+			host:    "0.0.0.0",
+			wantErr: ErrUnsafeHost,
+		},
+		{
+			name:    "loopback IPv6",
+			host:    "::1",
+			wantErr: ErrUnsafeHost,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ips, err := ValidateHost(tt.host)
+
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("ValidateHost() error = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("ValidateHost() unexpected error = %v", err)
+			}
+
+			if len(ips) == 0 {
+				t.Fatal("ValidateHost() returned no IPs, want at least one")
+			}
+		})
+	}
+}
 
 func TestParseURL(t *testing.T) {
 	tests := []struct {
@@ -108,7 +183,11 @@ func TestGetStatusCode(t *testing.T) {
 				t.Fatalf("ParseURL() unexpected error = %v", err)
 			}
 
-			statusCode, err := GetStatusCode(parsedURL)
+			addr := []netip.Addr{
+				netip.MustParseAddr(parsedURL.Hostname()),
+			}
+
+			statusCode, err := GetStatusCode(parsedURL, addr)
 			if err != nil {
 				t.Fatalf("GetStatusCode() unexpected error = %v", err)
 			}
@@ -132,7 +211,11 @@ func TestGetStatusCodeEndpointUnreachable(t *testing.T) {
 
 	server.Close()
 
-	statusCode, err := GetStatusCode(parsedURL)
+	addr := []netip.Addr{
+		netip.MustParseAddr(parsedURL.Hostname()),
+	}
+
+	statusCode, err := GetStatusCode(parsedURL, addr)
 	if err == nil {
 		t.Fatal("GetStatusCode() error = nil, want error")
 	}
@@ -142,18 +225,49 @@ func TestGetStatusCodeEndpointUnreachable(t *testing.T) {
 	}
 }
 
-func TestAddValidEndpoint(t *testing.T) {
+func TestGetStatusCodeUnsafeRedirect(t *testing.T) {
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
+			http.Redirect(w, r, "http://127.0.0.1/", http.StatusFound)
 		}),
 	)
 	defer server.Close()
 
-	store := Store{}
-	wantURL := server.URL + "/"
+	parsedURL, err := ParseURL(server.URL)
+	if err != nil {
+		t.Fatalf("ParseURL() unexpected error = %v", err)
+	}
 
-	endpoint, statusCode, err := store.Add(server.URL)
+	ips := []netip.Addr{
+		netip.MustParseAddr(parsedURL.Hostname()),
+	}
+
+	statusCode, err := GetStatusCode(parsedURL, ips)
+	if !errors.Is(err, ErrUnsafeHost) {
+		t.Fatalf("GetStatusCode() error = %v, want %v", err, ErrUnsafeHost)
+	}
+
+	if statusCode != 0 {
+		t.Errorf("GetStatusCode() = %d, want 0", statusCode)
+	}
+}
+
+func TestAddValidEndpoint(t *testing.T) {
+	store := NewStore()
+
+	store.validateHost = func(string) ([]netip.Addr, error) {
+		return []netip.Addr{
+			netip.MustParseAddr("93.184.216.34"),
+		}, nil
+	}
+
+	store.getStatusCode = func(*url.URL, []netip.Addr) (int, error) {
+		return http.StatusOK, nil
+	}
+
+	wantURL := "https://example.com/"
+
+	endpoint, statusCode, err := store.Add(wantURL)
 	if err != nil {
 		t.Fatalf("Add() unexpected error = %v", err)
 	}
@@ -176,9 +290,10 @@ func TestAddValidEndpoint(t *testing.T) {
 }
 
 func TestAddInvalidEndpoint(t *testing.T) {
-	store := Store{}
+	store := NewStore()
 
 	endpoint, statusCode, err := store.Add("example.com")
+
 	if !errors.Is(err, ErrUnsupportedScheme) {
 		t.Fatalf("Add() error = %v, want %v", err, ErrUnsupportedScheme)
 	}
@@ -197,21 +312,27 @@ func TestAddInvalidEndpoint(t *testing.T) {
 }
 
 func TestAddUnreachableEndpoint(t *testing.T) {
-	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
-	)
+	store := NewStore()
 
-	rawURL := server.URL
-	server.Close()
-
-	store := Store{}
-
-	endpoint, statusCode, err := store.Add(rawURL)
-	if err == nil {
-		t.Fatal("Add() error = nil, want error")
+	store.validateHost = func(string) ([]netip.Addr, error) {
+		return []netip.Addr{
+			netip.MustParseAddr("93.184.216.34"),
+		}, nil
 	}
 
-	wantURL := rawURL + "/"
+	unreachableErr := errors.New("endpoint unreachable")
+
+	store.getStatusCode = func(*url.URL, []netip.Addr) (int, error) {
+		return 0, unreachableErr
+	}
+
+	wantURL := "https://example.com/"
+
+	endpoint, statusCode, err := store.Add(wantURL)
+
+	if !errors.Is(err, unreachableErr) {
+		t.Fatalf("Add() error = %v, want %v", err, unreachableErr)
+	}
 
 	if endpoint.URL != wantURL {
 		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, wantURL)
@@ -223,6 +344,69 @@ func TestAddUnreachableEndpoint(t *testing.T) {
 
 	if len(store.endpoints) != 1 {
 		t.Errorf("Add() store size = %d, want 1", len(store.endpoints))
+	}
+}
+
+func TestAddDuplicateEndpoint(t *testing.T) {
+	store := NewStore()
+
+	store.validateHost = func(string) ([]netip.Addr, error) {
+		return []netip.Addr{
+			netip.MustParseAddr("93.184.216.34"),
+		}, nil
+	}
+
+	store.getStatusCode = func(*url.URL, []netip.Addr) (int, error) {
+		return http.StatusOK, nil
+	}
+
+	_, _, err := store.Add("https://example.com")
+	if err != nil {
+		t.Fatalf("Add() unexpected error = %v", err)
+	}
+
+	endpoint, statusCode, err := store.Add("https://example.com/")
+
+	if !errors.Is(err, ErrEndpointExists) {
+		t.Fatalf("Add() error = %v, want %v", err, ErrEndpointExists)
+	}
+
+	if endpoint != (Endpoint{}) {
+		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
+	}
+
+	if statusCode != 0 {
+		t.Errorf("Add() statusCode = %d, want 0", statusCode)
+	}
+
+	if len(store.endpoints) != 1 {
+		t.Errorf("Add() store size = %d, want 1", len(store.endpoints))
+	}
+}
+
+func TestAddUnsafeEndpoint(t *testing.T) {
+	store := NewStore()
+
+	store.validateHost = func(string) ([]netip.Addr, error) {
+		return nil, ErrUnsafeHost
+	}
+
+	endpoint, statusCode, err := store.Add("https://example.com/")
+
+	if !errors.Is(err, ErrUnsafeHost) {
+		t.Fatalf("Add() error = %v, want %v", err, ErrUnsafeHost)
+	}
+
+	if endpoint != (Endpoint{}) {
+		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
+	}
+
+	if statusCode != 0 {
+		t.Errorf("Add() statusCode = %d, want 0", statusCode)
+	}
+
+	if len(store.endpoints) != 0 {
+		t.Errorf("Add() store size = %d, want 0", len(store.endpoints))
 	}
 }
 
@@ -266,42 +450,8 @@ func TestExists(t *testing.T) {
 	}
 }
 
-func TestAddDuplicateEndpoint(t *testing.T) {
-	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}),
-	)
-	defer server.Close()
-
-	store := Store{}
-
-	_, _, err := store.Add(server.URL)
-	if err != nil {
-		t.Fatalf("Add() unexpected error = %v", err)
-	}
-
-	endpoint, statusCode, err := store.Add(server.URL + "/")
-	if !errors.Is(err, ErrEndpointExists) {
-		t.Fatalf("Add() error = %v, want %v", err, ErrEndpointExists)
-	}
-
-	if endpoint != (Endpoint{}) {
-		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
-	}
-
-	if statusCode != 0 {
-		t.Errorf("Add() statusCode = %d, want 0", statusCode)
-	}
-
-	if len(store.endpoints) != 1 {
-		t.Errorf("Add() store size = %d, want 1", len(store.endpoints))
-	}
-}
-
 func TestGetByID(t *testing.T) {
 	id := uuid.NewV7()
-	missingID := uuid.NewV7()
 
 	store := Store{
 		endpoints: []Endpoint{
@@ -326,6 +476,7 @@ func TestGetByID(t *testing.T) {
 		t.Errorf("GetByID() endpoint.URL = %q, want %q", endpoint.URL, "https://example.com/")
 	}
 
+	missingID := uuid.NewV7()
 	endpoint, found = store.GetByID(missingID)
 
 	if found {
@@ -356,6 +507,10 @@ func TestRemoveByID(t *testing.T) {
 
 		if len(store.endpoints) != 1 {
 			t.Errorf("RemoveByID() store size = %d, want 1", len(store.endpoints))
+		}
+
+		if store.endpoints[0].URL != "https://first.com/" {
+			t.Errorf("RemoveByID() remaining endpoint = %q, want %q", store.endpoints[0].URL, "https://first.com/")
 		}
 	})
 

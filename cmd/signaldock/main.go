@@ -15,9 +15,9 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	logger.Info("starting SignalDock", "port", port)
 
-	store := endpoint.Store{}
+	store := endpoint.NewStore()
 
-	handler, err := web.NewHandler(&store, logger)
+	handler, err := web.NewHandler(store, logger)
 	if err != nil {
 		logger.Error("failed to create HTTP handler", "error", err)
 		os.Exit(1)

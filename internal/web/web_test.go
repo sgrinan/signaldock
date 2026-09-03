@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"uuid"
@@ -13,23 +14,57 @@ import (
 	"github.com/sgrinan/signaldock/internal/endpoint"
 )
 
+type fakeStore struct {
+	endpoints []endpoint.Endpoint
+}
+
+func (store *fakeStore) List() []endpoint.Endpoint {
+	return store.endpoints
+}
+
+func (store *fakeStore) GetByID(id uuid.UUID) (endpoint.Endpoint, bool) {
+	for _, endpoint := range store.endpoints {
+		if endpoint.ID == id {
+			return endpoint, true
+		}
+	}
+	return endpoint.Endpoint{}, false
+}
+
+func (store *fakeStore) RemoveByID(id uuid.UUID) bool {
+	for i, ep := range store.endpoints {
+		if ep.ID == id {
+			store.endpoints = slices.Delete(store.endpoints, i, i+1)
+			return true
+		}
+	}
+	return false
+}
+
+func (store *fakeStore) Add(rawURL string) (endpoint.Endpoint, int, error) {
+	ep := endpoint.Endpoint{
+		ID:  uuid.NewV7(),
+		URL: rawURL,
+	}
+
+	store.endpoints = append(store.endpoints, ep)
+
+	return ep, http.StatusOK, nil
+}
+
 func TestGetIndex(t *testing.T) {
-	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}),
-	)
-	defer server.Close()
+	wantURL := "https://example.com/"
 
-	store := endpoint.Store{}
-
-	_, _, err := store.Add(server.URL)
-	if err != nil {
-		t.Fatalf("Add() unexpected error = %v", err)
+	store := &fakeStore{
+		endpoints: []endpoint.Endpoint{
+			{
+				URL: wantURL,
+			},
+		},
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	handler, err := NewHandler(&store, logger)
+	handler, err := NewHandler(store, logger)
 	if err != nil {
 		t.Fatalf("NewHandler() unexpected error = %v", err)
 	}
@@ -43,29 +78,23 @@ func TestGetIndex(t *testing.T) {
 		t.Errorf("GET / status = %d, want %d", recorder.Code, http.StatusOK)
 	}
 
-	if !strings.Contains(recorder.Body.String(), server.URL) {
-		t.Errorf("GET / body = %q, want endpoint URL %q", recorder.Body.String(), server.URL)
+	if !strings.Contains(recorder.Body.String(), wantURL) {
+		t.Errorf("GET / body = %q, want endpoint URL %q", recorder.Body.String(), wantURL)
 	}
 }
 
 func TestPostEndpoint(t *testing.T) {
-	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}),
-	)
-	defer server.Close()
-
-	store := endpoint.Store{}
+	store := &fakeStore{}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	handler, err := NewHandler(&store, logger)
+	handler, err := NewHandler(store, logger)
 	if err != nil {
 		t.Fatalf("NewHandler() unexpected error = %v", err)
 	}
 
+	wantURL := "https://example.com/"
 	form := url.Values{}
-	form.Set("url", server.URL)
+	form.Set("url", wantURL)
 
 	request := httptest.NewRequest(http.MethodPost, "/endpoints", strings.NewReader(form.Encode()))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -85,31 +114,33 @@ func TestPostEndpoint(t *testing.T) {
 	if len(store.List()) != 1 {
 		t.Errorf("POST /endpoints store size = %d, want 1", len(store.List()))
 	}
+
+	if store.List()[0].URL != wantURL {
+		t.Errorf("POST /endpoints URL = %q, want %q", store.List()[0].URL, wantURL)
+	}
 }
 
 func TestGetEndpoint(t *testing.T) {
-	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}),
-	)
-	defer server.Close()
+	id := uuid.NewV7()
+	wantURL := "https://example.com/"
 
-	store := endpoint.Store{}
-
-	added, _, err := store.Add(server.URL)
-	if err != nil {
-		t.Fatalf("Add() unexpected error = %v", err)
+	store := &fakeStore{
+		endpoints: []endpoint.Endpoint{
+			{
+				ID:  id,
+				URL: wantURL,
+			},
+		},
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	handler, err := NewHandler(&store, logger)
+	handler, err := NewHandler(store, logger)
 	if err != nil {
 		t.Fatalf("NewHandler() unexpected error = %v", err)
 	}
 
 	t.Run("existing endpoint", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodGet, "/endpoints/"+added.ID.String(), nil)
+		request := httptest.NewRequest(http.MethodGet, "/endpoints/"+id.String(), nil)
 		recorder := httptest.NewRecorder()
 
 		handler.ServeHTTP(recorder, request)
@@ -118,8 +149,8 @@ func TestGetEndpoint(t *testing.T) {
 			t.Errorf("GET /endpoints/{id} status = %d, want %d", recorder.Code, http.StatusOK)
 		}
 
-		if !strings.Contains(recorder.Body.String(), added.URL) {
-			t.Errorf("GET /endpoints/{id} body = %q, want endpoint URL %q", recorder.Body.String(), added.URL)
+		if !strings.Contains(recorder.Body.String(), wantURL) {
+			t.Errorf("GET /endpoints/{id} body = %q, want endpoint URL %q", recorder.Body.String(), wantURL)
 		}
 	})
 
@@ -148,28 +179,30 @@ func TestGetEndpoint(t *testing.T) {
 }
 
 func TestPostDeleteEndpoint(t *testing.T) {
-	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}),
-	)
-	defer server.Close()
+	id := uuid.NewV7()
+	otherID := uuid.NewV7()
 
-	store := endpoint.Store{}
-
-	added, _, err := store.Add(server.URL)
-	if err != nil {
-		t.Fatalf("Add() unexpected error = %v", err)
+	store := &fakeStore{
+		endpoints: []endpoint.Endpoint{
+			{
+				ID:  id,
+				URL: "https://example.com/",
+			},
+			{
+				ID:  otherID,
+				URL: "https://second.com/",
+			},
+		},
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	handler, err := NewHandler(&store, logger)
+	handler, err := NewHandler(store, logger)
 	if err != nil {
 		t.Fatalf("NewHandler() unexpected error = %v", err)
 	}
 
 	t.Run("existing endpoint", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/endpoints/"+added.ID.String()+"/delete", nil)
+		request := httptest.NewRequest(http.MethodPost, "/endpoints/"+id.String()+"/delete", nil)
 		recorder := httptest.NewRecorder()
 
 		handler.ServeHTTP(recorder, request)
@@ -182,8 +215,12 @@ func TestPostDeleteEndpoint(t *testing.T) {
 			t.Errorf("POST /endpoints/{id}/delete Location = %q, want %q", location, "/")
 		}
 
-		if len(store.List()) != 0 {
-			t.Errorf("POST /endpoints/{id}/delete store size = %d, want 0", len(store.List()))
+		if len(store.List()) != 1 {
+			t.Errorf("POST /endpoints/{id}/delete store size = %d, want 1", len(store.List()))
+		}
+
+		if store.List()[0].ID != otherID {
+			t.Errorf("POST /endpoints/{id}/delete remaining ID = %v, want %v", store.List()[0].ID, otherID)
 		}
 	})
 
