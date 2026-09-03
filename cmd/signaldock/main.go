@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/sgrinan/signaldock/internal/endpoint"
@@ -35,10 +39,26 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+
 	logger.Info("starting SignalDock", "port", port)
 
-	if err := server.ListenAndServe(); err != nil {
-		logger.Error("HTTP server stopped", "error", err)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("HTTP server stopped", "error", err)
+		}
+	}()
+
+	<-shutdown
+
+	logger.Info("shutting down SignalDock")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("failed to shutdown HTTP server", "error", err)
 		os.Exit(1)
 	}
 }
