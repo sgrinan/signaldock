@@ -111,6 +111,36 @@ func TestParseURL(t *testing.T) {
 			wantURL: "https://example.com/health",
 		},
 		{
+			name:    "valid URL with www hostname",
+			url:     "https://www.example.com",
+			wantURL: "https://www.example.com/",
+		},
+		{
+			name:    "normalizes uppercase www hostname",
+			url:     "https://WWW.EXAMPLE.COM",
+			wantURL: "https://www.example.com/",
+		},
+		{
+			name:    "normalizes uppercase scheme and hostname",
+			url:     "HTTPS://EXAMPLE.COM",
+			wantURL: "https://example.com/",
+		},
+		{
+			name:    "normalizes hostname with port",
+			url:     "https://EXAMPLE.COM:8443/",
+			wantURL: "https://example.com:8443/",
+		},
+		{
+			name:    "preserves path case",
+			url:     "https://EXAMPLE.COM/MyAPI/Health",
+			wantURL: "https://example.com/MyAPI/Health",
+		},
+		{
+			name:    "valid IPv6 URL",
+			url:     "https://[2001:DB8::1]/",
+			wantURL: "https://[2001:db8::1]/",
+		},
+		{
 			name:    "missing scheme",
 			url:     "example.com",
 			wantErr: ErrUnsupportedScheme,
@@ -365,7 +395,7 @@ func TestAddDuplicateEndpoint(t *testing.T) {
 		t.Fatalf("Add() unexpected error = %v", err)
 	}
 
-	endpoint, statusCode, err := store.Add("https://example.com/")
+	endpoint, statusCode, err := store.Add("https://EXAMPLE.COM/")
 
 	if !errors.Is(err, ErrEndpointExists) {
 		t.Fatalf("Add() error = %v, want %v", err, ErrEndpointExists)
