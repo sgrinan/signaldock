@@ -1,25 +1,25 @@
 <h1>SignalDock</h1>
 
 <form method="POST" action="/endpoints">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+
     <input type="url" id="url" name="url" required>
     <button type="submit">Add</button>
-    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
 </form>
 
 <h2>Endpoints</h2>
 
 {{ range .Endpoints }}
-    <p>
-        {{ .URL }} 
+    <div>
+        <span>{{ .URL }}</span>
         <a href="/endpoints/{{ .ID }}">View</a>
-        
-        <form method="POST" action="/endpoints/{{ .ID }}/delete">
-            <button type="submit">Remove</button>
-            <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-        </form>
-    </p>
-{{ end }}
 
+        <form method="POST" action="/endpoints/{{ .ID }}/delete">
+            <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+            <button type="submit">Remove</button>
+        </form>
+    </div>
+{{ end }}
 
 {{ if .Error }}
     <p>{{ .Error }}</p>

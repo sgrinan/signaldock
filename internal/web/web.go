@@ -66,7 +66,7 @@ func NewHandler(store EndpointStore, logger *slog.Logger) (http.Handler, error) 
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /", handleGetIndex(store, tmpl, logger))
+	mux.HandleFunc("GET /{$}", handleGetIndex(store, tmpl, logger))
 	mux.HandleFunc("POST /endpoints", handlePostEndpoint(store, logger))
 	mux.HandleFunc("GET /endpoints/{id}", handleGetEndpoint(store, tmpl, logger))
 	mux.HandleFunc("POST /endpoints/{id}/delete", handleDeleteEndpoint(store))
