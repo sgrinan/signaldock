@@ -418,3 +418,34 @@ func TestPostDeleteEndpoint(t *testing.T) {
 		}
 	})
 }
+
+func TestSecurityHeaders(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := securityHeaders(next)
+
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("securityHeaders status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+
+	if got := recorder.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %q, want %q", got, "nosniff")
+	}
+
+	if got := recorder.Header().Get("Referrer-Policy"); got != "no-referrer" {
+		t.Errorf("Referrer-Policy = %q, want %q", got, "no-referrer")
+	}
+
+	wantCSP := "default-src 'self'; frame-ancestors 'none'"
+
+	if got := recorder.Header().Get("Content-Security-Policy"); got != wantCSP {
+		t.Errorf("Content-Security-Policy = %q, want %q", got, wantCSP)
+	}
+}

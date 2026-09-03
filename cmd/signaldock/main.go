@@ -4,16 +4,19 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/sgrinan/signaldock/internal/endpoint"
 	"github.com/sgrinan/signaldock/internal/web"
 )
 
-const port = "8080"
-
 func main() {
+	port := os.Getenv("SIGNALDOCK_PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	logger.Info("starting SignalDock", "port", port)
 
 	store := endpoint.NewStore()
 
@@ -23,7 +26,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
+	server := &http.Server{
+		Addr:              ":" + port,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	logger.Info("starting SignalDock", "port", port)
+
+	if err := server.ListenAndServe(); err != nil {
 		logger.Error("HTTP server stopped", "error", err)
 		os.Exit(1)
 	}

@@ -48,7 +48,17 @@ func validateCSRF(r *http.Request) bool {
 	return cookie.Value != "" && formToken != "" && cookie.Value == formToken
 }
 
-func NewHandler(store EndpointStore, logger *slog.Logger) (*http.ServeMux, error) {
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func NewHandler(store EndpointStore, logger *slog.Logger) (http.Handler, error) {
 	tmpl, err := template.ParseFS(templates, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
@@ -61,7 +71,7 @@ func NewHandler(store EndpointStore, logger *slog.Logger) (*http.ServeMux, error
 	mux.HandleFunc("GET /endpoints/{id}", handleGetEndpoint(store, tmpl, logger))
 	mux.HandleFunc("POST /endpoints/{id}/delete", handleDeleteEndpoint(store))
 
-	return mux, nil
+	return securityHeaders(mux), nil
 }
 
 func handleGetIndex(store EndpointStore, tmpl *template.Template, logger *slog.Logger) http.HandlerFunc {
