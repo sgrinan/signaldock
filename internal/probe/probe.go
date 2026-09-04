@@ -145,3 +145,20 @@ func doRequest(parsedURL *url.URL, ips []netip.Addr) (*http.Response, time.Durat
 
 	return resp, latency, nil
 }
+
+func HTTP(parsedURL *url.URL, ips []netip.Addr) (Result, error) {
+	resp, latency, err := doRequest(parsedURL, ips)
+	if err != nil {
+		return Result{
+			Latency: latency,
+			Available: false,
+		}, err
+	}
+	defer resp.Body.Close()
+
+	return Result{
+		StatusCode: resp.StatusCode,
+		Latency: latency,
+		Available: true,
+	}, nil
+}
