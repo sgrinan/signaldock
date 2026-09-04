@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 	"uuid"
@@ -535,5 +536,71 @@ func TestRefreshUnreachableEndpoint(t *testing.T) {
 
 	if store.endpoints[0].LastResult != wantResult {
 		t.Errorf("Refresh() stored LastResult = %+v, want %+v", store.endpoints[0].LastResult, wantResult)
+	}
+}
+
+func TestAddConcurrentDuplicateEndpoint(t *testing.T) {
+	store := NewStore()
+
+	store.validateHost = func(string) ([]netip.Addr, error) {
+		return []netip.Addr{
+			netip.MustParseAddr("93.184.216.34"),
+		}, nil
+	}
+
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		time.Sleep(50 * time.Millisecond)
+
+		return probe.Result{
+			StatusCode: http.StatusOK,
+			Available:  true,
+		}, nil
+	}
+
+	const attempts = 10
+
+	var wg sync.WaitGroup
+	wg.Add(attempts)
+
+	errorsCh := make(chan error, attempts)
+
+	for range attempts {
+		go func() {
+			defer wg.Done()
+
+			_, _, err := store.Add("https://example.com/")
+			errorsCh <- err
+		}()
+	}
+
+	wg.Wait()
+	close(errorsCh)
+
+	var successCount int
+	var duplicateCount int
+
+	for err := range errorsCh {
+		switch {
+		case err == nil:
+			successCount++
+
+		case errors.Is(err, ErrEndpointExists):
+			duplicateCount++
+
+		default:
+			t.Fatalf("Add() unexpected error = %v", err)
+		}
+	}
+
+	if successCount != 1 {
+		t.Errorf("Add() success count = %d, want 1", successCount)
+	}
+
+	if duplicateCount != attempts-1 {
+		t.Errorf("Add() duplicate count = %d, want %d", duplicateCount, attempts-1)
+	}
+
+	if len(store.List()) != 1 {
+		t.Errorf("Add() store size = %d, want 1", len(store.List()))
 	}
 }

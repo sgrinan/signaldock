@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/probe"
@@ -27,6 +28,7 @@ type Endpoint struct {
 }
 
 type Store struct {
+	mu           sync.RWMutex
 	endpoints    []Endpoint
 	validateHost func(string) ([]netip.Addr, error)
 	probeHTTP    func(*url.URL, []netip.Addr) (probe.Result, error)
@@ -86,33 +88,61 @@ func (store *Store) Add(rawURL string) (Endpoint, probe.Result, error) {
 		return Endpoint{}, probe.Result{}, err
 	}
 
-	if store.Exists(parsedURL.String()) {
+	endpoint := Endpoint{
+		ID:  uuid.NewV7(),
+		URL: parsedURL.String(),
+	}
+
+	store.mu.Lock()
+
+	if store.existsLocked(parsedURL.String()) {
+		store.mu.Unlock()
 		return Endpoint{}, probe.Result{}, ErrEndpointExists
 	}
 
+	store.endpoints = append(store.endpoints, endpoint)
+
+	store.mu.Unlock()
+
 	result, err := store.probeHTTP(parsedURL, ips)
 
-	endpoint := Endpoint{
-		ID:         uuid.NewV7(),
-		URL:        parsedURL.String(),
-		LastResult: result,
+	store.mu.Lock()
+
+	for i := range store.endpoints {
+		if store.endpoints[i].ID == endpoint.ID {
+			store.endpoints[i].LastResult = result
+			endpoint.LastResult = result
+			break
+		}
 	}
+
+	store.mu.Unlock()
 
 	if err != nil {
-		store.endpoints = append(store.endpoints, endpoint)
 		return endpoint, result, err
 	}
-
-	store.endpoints = append(store.endpoints, endpoint)
 
 	return endpoint, result, nil
 }
 
 func (store *Store) List() []Endpoint {
-	return store.endpoints
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	endpoints := make([]Endpoint, len(store.endpoints))
+	copy(endpoints, store.endpoints)
+
+	return endpoints
 }
 
 func (store *Store) Exists(url string) bool {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	return store.existsLocked(url)
+}
+
+func (store *Store) existsLocked(url string) bool {
 	for _, endpoint := range store.endpoints {
 		if endpoint.URL == url {
 			return true
@@ -122,15 +152,22 @@ func (store *Store) Exists(url string) bool {
 }
 
 func (store *Store) GetByID(id uuid.UUID) (Endpoint, bool) {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
 	for _, endpoint := range store.endpoints {
 		if endpoint.ID == id {
 			return endpoint, true
 		}
 	}
+
 	return Endpoint{}, false
 }
 
 func (store *Store) RemoveByID(id uuid.UUID) bool {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
 	for i, endpoint := range store.endpoints {
 		if endpoint.ID == id {
 			store.endpoints = slices.Delete(store.endpoints, i, i+1)
@@ -158,12 +195,14 @@ func (store *Store) Refresh(id uuid.UUID) (probe.Result, error) {
 
 	result, err := store.probeHTTP(parsedURL, ips)
 
+	store.mu.Lock()
 	for i := range store.endpoints {
 		if store.endpoints[i].ID == id {
 			store.endpoints[i].LastResult = result
 			break
 		}
 	}
+	store.mu.Unlock()
 
 	if err != nil {
 		return result, err

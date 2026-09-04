@@ -18,6 +18,7 @@ type Result struct {
 	StatusCode int
 	Latency    time.Duration
 	Available  bool
+	CheckedAt  time.Time
 }
 
 func isUnsafeAddr(addr netip.Addr) bool {
@@ -137,11 +138,18 @@ func doRequest(parsedURL *url.URL, ips []netip.Addr) (*http.Response, time.Durat
 }
 
 func HTTP(parsedURL *url.URL, ips []netip.Addr) (Result, error) {
+	if len(ips) == 0 {
+		return Result{}, ErrUnsafeHost
+	}
+
 	resp, latency, err := doRequest(parsedURL, ips)
+	checkedAt := time.Now()
+
 	if err != nil {
 		return Result{
 			Latency:   latency,
 			Available: false,
+			CheckedAt: checkedAt,
 		}, err
 	}
 	defer resp.Body.Close()
@@ -150,5 +158,6 @@ func HTTP(parsedURL *url.URL, ips []netip.Addr) (Result, error) {
 		StatusCode: resp.StatusCode,
 		Latency:    latency,
 		Available:  true,
+		CheckedAt:  checkedAt,
 	}, nil
 }

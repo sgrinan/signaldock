@@ -5,6 +5,7 @@
 <p>Status code: {{ .Endpoint.LastResult.StatusCode }}</p>
 <p>Available: {{ .Endpoint.LastResult.Available }}</p>
 <p>Latency: {{ .LatencyMS }} ms</p>
+<p>Last checked: {{ .LastCheckedAt }}</p>
 
 <form method="POST" action="/endpoints/{{ .Endpoint.ID }}/refresh">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">

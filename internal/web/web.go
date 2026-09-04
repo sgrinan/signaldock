@@ -25,9 +25,10 @@ type PageData struct {
 }
 
 type EndpointPageData struct {
-	Endpoint  endpoint.Endpoint
-	CSRFToken string
-	LatencyMS int64
+	Endpoint      endpoint.Endpoint
+	CSRFToken     string
+	LatencyMS     int64
+	LastCheckedAt string
 }
 
 type EndpointStore interface {
@@ -181,9 +182,10 @@ func handleGetEndpoint(store EndpointStore, tmpl *template.Template, logger *slo
 		csrfToken := generateCSRFToken()
 
 		pageData := EndpointPageData{
-			Endpoint:  ep,
-			CSRFToken: csrfToken,
-			LatencyMS: ep.LastResult.Latency.Milliseconds(),
+			Endpoint:      ep,
+			CSRFToken:     csrfToken,
+			LatencyMS:     ep.LastResult.Latency.Milliseconds(),
+			LastCheckedAt: ep.LastResult.CheckedAt.Format("15:04:05"),
 		}
 
 		http.SetCookie(w, &http.Cookie{
