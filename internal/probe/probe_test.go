@@ -116,6 +116,10 @@ func TestHTTP(t *testing.T) {
 		if result.Latency <= 0 {
 			t.Errorf("HTTP() Latency = %v, want > 0", result.Latency)
 		}
+
+		if result.CheckedAt.IsZero() {
+			t.Error("HTTP() CheckedAt is zero, want check time")
+		}
 	})
 
 	t.Run("HTTP 503", func(t *testing.T) {
@@ -151,6 +155,10 @@ func TestHTTP(t *testing.T) {
 		if result.Latency <= 0 {
 			t.Errorf("HTTP() Latency = %v, want > 0", result.Latency)
 		}
+
+		if result.CheckedAt.IsZero() {
+			t.Error("HTTP() CheckedAt is zero, want check time")
+		}
 	})
 
 	t.Run("HTTP Endpoint unreachable", func(t *testing.T) {
@@ -184,6 +192,10 @@ func TestHTTP(t *testing.T) {
 
 		if result.Latency <= 0 {
 			t.Errorf("HTTP() Latency = %v, want > 0", result.Latency)
+		}
+
+		if result.CheckedAt.IsZero() {
+			t.Error("HTTP() CheckedAt is zero, want check time")
 		}
 	})
 }
