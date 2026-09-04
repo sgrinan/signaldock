@@ -22,9 +22,14 @@ var (
 )
 
 type Endpoint struct {
-	ID         uuid.UUID
-	URL        string
-	LastResult probe.Result
+	ID        uuid.UUID
+	URL       string
+	LastCheck CheckResult
+}
+
+type CheckResult struct {
+	HTTP probe.Result
+	TLS  probe.TLSResult
 }
 
 type Store struct {
@@ -32,6 +37,7 @@ type Store struct {
 	endpoints    []Endpoint
 	validateHost func(string) ([]netip.Addr, error)
 	probeHTTP    func(*url.URL, []netip.Addr) (probe.Result, error)
+	probeTLS     func(*url.URL, []netip.Addr) (probe.TLSResult, error)
 }
 
 func ParseURL(rawURL string) (*url.URL, error) {
@@ -74,18 +80,19 @@ func NewStore() *Store {
 	return &Store{
 		validateHost: probe.ValidateHost,
 		probeHTTP:    probe.HTTP,
+		probeTLS:     probe.TLS,
 	}
 }
 
-func (store *Store) Add(rawURL string) (Endpoint, probe.Result, error) {
+func (store *Store) Add(rawURL string) (Endpoint, error) {
 	parsedURL, err := ParseURL(rawURL)
 	if err != nil {
-		return Endpoint{}, probe.Result{}, err
+		return Endpoint{}, err
 	}
 
 	ips, err := store.validateHost(parsedURL.Hostname())
 	if err != nil {
-		return Endpoint{}, probe.Result{}, err
+		return Endpoint{}, err
 	}
 
 	endpoint := Endpoint{
@@ -97,32 +104,39 @@ func (store *Store) Add(rawURL string) (Endpoint, probe.Result, error) {
 
 	if store.existsLocked(parsedURL.String()) {
 		store.mu.Unlock()
-		return Endpoint{}, probe.Result{}, ErrEndpointExists
+		return Endpoint{}, ErrEndpointExists
 	}
 
 	store.endpoints = append(store.endpoints, endpoint)
 
 	store.mu.Unlock()
 
-	result, err := store.probeHTTP(parsedURL, ips)
+	httpResult, httpErr := store.probeHTTP(parsedURL, ips)
+	tlsResult, tlsErr := store.probeTLS(parsedURL, ips)
+
+	lastCheck := CheckResult{
+		HTTP: httpResult,
+		TLS:  tlsResult,
+	}
+
+	endpoint.LastCheck = lastCheck
 
 	store.mu.Lock()
 
 	for i := range store.endpoints {
 		if store.endpoints[i].ID == endpoint.ID {
-			store.endpoints[i].LastResult = result
-			endpoint.LastResult = result
+			store.endpoints[i].LastCheck = lastCheck
 			break
 		}
 	}
 
 	store.mu.Unlock()
 
-	if err != nil {
-		return endpoint, result, err
+	if httpErr != nil || tlsErr != nil {
+		return endpoint, errors.Join(httpErr, tlsErr)
 	}
 
-	return endpoint, result, nil
+	return endpoint, nil
 }
 
 func (store *Store) List() []Endpoint {
@@ -177,36 +191,42 @@ func (store *Store) RemoveByID(id uuid.UUID) bool {
 	return false
 }
 
-func (store *Store) Refresh(id uuid.UUID) (probe.Result, error) {
+func (store *Store) Refresh(id uuid.UUID) (CheckResult, error) {
 	endpoint, found := store.GetByID(id)
 	if !found {
-		return probe.Result{}, ErrEndpointNotFound
+		return CheckResult{}, ErrEndpointNotFound
 	}
 
 	parsedURL, err := ParseURL(endpoint.URL)
 	if err != nil {
-		return probe.Result{}, err
+		return CheckResult{}, err
 	}
 
 	ips, err := store.validateHost(parsedURL.Hostname())
 	if err != nil {
-		return probe.Result{}, err
+		return CheckResult{}, err
 	}
 
-	result, err := store.probeHTTP(parsedURL, ips)
+	httpResult, httpErr := store.probeHTTP(parsedURL, ips)
+	tlsResult, tlsErr := store.probeTLS(parsedURL, ips)
+
+	lastCheck := CheckResult{
+		HTTP: httpResult,
+		TLS:  tlsResult,
+	}
 
 	store.mu.Lock()
 	for i := range store.endpoints {
 		if store.endpoints[i].ID == id {
-			store.endpoints[i].LastResult = result
+			store.endpoints[i].LastCheck = lastCheck
 			break
 		}
 	}
 	store.mu.Unlock()
 
-	if err != nil {
-		return result, err
+	if httpErr != nil || tlsErr != nil {
+		return lastCheck, errors.Join(httpErr, tlsErr)
 	}
 
-	return result, nil
+	return lastCheck, nil
 }

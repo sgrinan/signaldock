@@ -25,9 +25,9 @@ func (store *fakeStore) List() []endpoint.Endpoint {
 }
 
 func (store *fakeStore) GetByID(id uuid.UUID) (endpoint.Endpoint, bool) {
-	for _, endpoint := range store.endpoints {
-		if endpoint.ID == id {
-			return endpoint, true
+	for _, ep := range store.endpoints {
+		if ep.ID == id {
+			return ep, true
 		}
 	}
 	return endpoint.Endpoint{}, false
@@ -43,35 +43,50 @@ func (store *fakeStore) RemoveByID(id uuid.UUID) bool {
 	return false
 }
 
-func (store *fakeStore) Add(rawURL string) (endpoint.Endpoint, probe.Result, error) {
+func (store *fakeStore) Add(rawURL string) (endpoint.Endpoint, error) {
+	check := endpoint.CheckResult{
+		HTTP: probe.Result{
+			StatusCode: http.StatusOK,
+			Available:  true,
+		},
+		TLS: probe.TLSResult{
+			Enabled: true,
+			Valid:   true,
+		},
+	}
+
 	ep := endpoint.Endpoint{
-		ID:  uuid.NewV7(),
-		URL: rawURL,
+		ID:        uuid.NewV7(),
+		URL:       rawURL,
+		LastCheck: check,
 	}
 
 	store.endpoints = append(store.endpoints, ep)
 
-	return ep, probe.Result{
-		StatusCode: http.StatusOK,
-		Available:  true,
-	}, nil
+	return ep, nil
 }
 
-func (store *fakeStore) Refresh(id uuid.UUID) (probe.Result, error) {
+func (store *fakeStore) Refresh(id uuid.UUID) (endpoint.CheckResult, error) {
 	for i := range store.endpoints {
 		if store.endpoints[i].ID == id {
-			result := probe.Result{
-				StatusCode: http.StatusOK,
-				Available:  true,
+			check := endpoint.CheckResult{
+				HTTP: probe.Result{
+					StatusCode: http.StatusOK,
+					Available:  true,
+				},
+				TLS: probe.TLSResult{
+					Enabled: true,
+					Valid:   true,
+				},
 			}
 
-			store.endpoints[i].LastResult = result
+			store.endpoints[i].LastCheck = check
 
-			return result, nil
+			return check, nil
 		}
 	}
 
-	return probe.Result{}, endpoint.ErrEndpointNotFound
+	return endpoint.CheckResult{}, endpoint.ErrEndpointNotFound
 }
 
 func TestSecurityHeaders(t *testing.T) {
@@ -232,10 +247,16 @@ func TestGetEndpoint(t *testing.T) {
 			{
 				ID:  id,
 				URL: wantURL,
-				LastResult: probe.Result{
-					StatusCode: http.StatusOK,
-					Latency:    50 * time.Millisecond,
-					Available:  true,
+				LastCheck: endpoint.CheckResult{
+					HTTP: probe.Result{
+						StatusCode: http.StatusOK,
+						Latency:    50 * time.Millisecond,
+						Available:  true,
+					},
+					TLS: probe.TLSResult{
+						Enabled: true,
+						Valid:   true,
+					},
 				},
 			},
 		},
@@ -442,15 +463,23 @@ func TestPostDeleteEndpoint(t *testing.T) {
 
 func TestRefreshEndpoint(t *testing.T) {
 	id := uuid.NewV7()
+	wantURL := "https://example.com/"
 
 	store := &fakeStore{
 		endpoints: []endpoint.Endpoint{
 			{
 				ID:  id,
-				URL: "https://example.com/",
-				LastResult: probe.Result{
-					StatusCode: http.StatusServiceUnavailable,
-					Available:  true,
+				URL: wantURL,
+				LastCheck: endpoint.CheckResult{
+					HTTP: probe.Result{
+						StatusCode: http.StatusServiceUnavailable,
+						Latency:    50 * time.Millisecond,
+						Available:  true,
+					},
+					TLS: probe.TLSResult{
+						Enabled: true,
+						Valid:   true,
+					},
 				},
 			},
 		},
@@ -465,7 +494,6 @@ func TestRefreshEndpoint(t *testing.T) {
 
 	request := newCSRFPostRequest(t, "/endpoints/"+id.String()+"/refresh", nil)
 	recorder := httptest.NewRecorder()
-
 	handler.ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusSeeOther {
@@ -478,12 +506,16 @@ func TestRefreshEndpoint(t *testing.T) {
 		t.Errorf("POST /endpoints/{id}/refresh Location = %q, want %q", location, wantLocation)
 	}
 
-	if store.endpoints[0].LastResult.StatusCode != http.StatusOK {
-		t.Errorf("POST /endpoints/{id}/refresh StatusCode = %d, want %d", store.endpoints[0].LastResult.StatusCode, http.StatusOK)
+	if store.endpoints[0].LastCheck.HTTP.StatusCode != http.StatusOK {
+		t.Errorf("POST /endpoints/{id}/refresh StatusCode = %d, want %d", store.endpoints[0].LastCheck.HTTP.StatusCode, http.StatusOK)
 	}
 
-	if !store.endpoints[0].LastResult.Available {
+	if !store.endpoints[0].LastCheck.HTTP.Available {
 		t.Error("POST /endpoints/{id}/refresh Available = false, want true")
+	}
+
+	if !store.endpoints[0].LastCheck.TLS.Valid {
+		t.Error("POST /endpoints/{id}/refresh TLS.Valid = false, want true")
 	}
 }
 

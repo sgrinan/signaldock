@@ -32,11 +32,11 @@ type EndpointPageData struct {
 }
 
 type EndpointStore interface {
-	Add(string) (endpoint.Endpoint, probe.Result, error)
+	Add(string) (endpoint.Endpoint, error)
 	List() []endpoint.Endpoint
 	GetByID(uuid.UUID) (endpoint.Endpoint, bool)
 	RemoveByID(uuid.UUID) bool
-	Refresh(uuid.UUID) (probe.Result, error)
+	Refresh(uuid.UUID) (endpoint.CheckResult, error)
 }
 
 func generateCSRFToken() string {
@@ -130,7 +130,7 @@ func handlePostEndpoint(store EndpointStore, logger *slog.Logger) http.HandlerFu
 
 		rawURL := r.FormValue("url")
 
-		added, _, err := store.Add(rawURL)
+		added, err := store.Add(rawURL)
 		switch {
 		case err == nil:
 			logger.Info("endpoint added", "url", added.URL, "id", added.ID)
@@ -184,8 +184,8 @@ func handleGetEndpoint(store EndpointStore, tmpl *template.Template, logger *slo
 		pageData := EndpointPageData{
 			Endpoint:      ep,
 			CSRFToken:     csrfToken,
-			LatencyMS:     ep.LastResult.Latency.Milliseconds(),
-			LastCheckedAt: ep.LastResult.CheckedAt.Format("15:04:05"),
+			LatencyMS:     ep.LastCheck.HTTP.Latency.Milliseconds(),
+			LastCheckedAt: ep.LastCheck.HTTP.CheckedAt.Format("15:04:05"),
 		}
 
 		http.SetCookie(w, &http.Cookie{
@@ -252,9 +252,9 @@ func handleRefreshEndpoint(store EndpointStore, logger *slog.Logger) http.Handle
 			logger.Info(
 				"endpoint refreshed",
 				"id", id,
-				"status_code", result.StatusCode,
-				"available", result.Available,
-				"latency", result.Latency,
+				"status_code", result.HTTP.StatusCode,
+				"available", result.HTTP.Available,
+				"latency", result.HTTP.Latency,
 			)
 
 		case errors.Is(err, endpoint.ErrEndpointNotFound):

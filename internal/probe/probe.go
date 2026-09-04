@@ -2,6 +2,8 @@ package probe
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
@@ -19,6 +21,13 @@ type Result struct {
 	Latency    time.Duration
 	Available  bool
 	CheckedAt  time.Time
+}
+
+type TLSResult struct {
+	Enabled       bool
+	Valid         bool
+	ExpiresAt     time.Time
+	DaysRemaining int
 }
 
 func isUnsafeAddr(addr netip.Addr) bool {
@@ -160,4 +169,75 @@ func HTTP(parsedURL *url.URL, ips []netip.Addr) (Result, error) {
 		Available:  true,
 		CheckedAt:  checkedAt,
 	}, nil
+}
+
+func TLS(parsedURL *url.URL, ips []netip.Addr) (TLSResult, error) {
+	return tlsProbe(parsedURL, ips, nil)
+}
+
+func tlsProbe(parsedURL *url.URL, ips []netip.Addr, rootCAs *x509.CertPool) (TLSResult, error) {
+	if parsedURL.Scheme != "https" {
+		return TLSResult{}, nil
+	}
+
+	if len(ips) == 0 {
+		return TLSResult{}, ErrUnsafeHost
+	}
+
+	config := newTLSConfig(parsedURL.Hostname())
+	config.RootCAs = rootCAs
+
+	port := parsedURL.Port()
+	if port == "" {
+		port = "443"
+	}
+
+	var lastErr error
+	for _, ip := range ips {
+		target := net.JoinHostPort(ip.String(), port)
+
+		dialer := &net.Dialer{
+			Timeout: 5 * time.Second,
+		}
+
+		conn, err := tls.DialWithDialer(dialer, "tcp", target, config)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		state := conn.ConnectionState()
+
+		if len(state.PeerCertificates) == 0 {
+			conn.Close()
+
+			return TLSResult{
+				Enabled: true,
+			}, errors.New("TLS connection returned no peer certificate")
+		}
+
+		cert := state.PeerCertificates[0]
+
+		expiresAt := cert.NotAfter
+		daysRemaining := int(time.Until(expiresAt).Hours() / 24)
+
+		conn.Close()
+
+		return TLSResult{
+			Enabled:       true,
+			ExpiresAt:     expiresAt,
+			DaysRemaining: daysRemaining,
+		}, nil
+	}
+
+	return TLSResult{
+		Enabled: true,
+	}, lastErr
+}
+
+func newTLSConfig(serverName string) *tls.Config {
+	return &tls.Config{
+		ServerName: serverName,
+		MinVersion: tls.VersionTLS12,
+	}
 }

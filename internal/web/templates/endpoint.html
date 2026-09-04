@@ -2,8 +2,8 @@
 
 <p>{{ .Endpoint.URL }}</p>
 
-<p>Status code: {{ .Endpoint.LastResult.StatusCode }}</p>
-<p>Available: {{ .Endpoint.LastResult.Available }}</p>
+<p>Status code: {{ .Endpoint.LastCheck.HTTP.StatusCode }}</p>
+<p>Available: {{ .Endpoint.LastCheck.HTTP.Available }}</p>
 <p>Latency: {{ .LatencyMS }} ms</p>
 <p>Last checked: {{ .LastCheckedAt }}</p>
 
@@ -13,3 +13,13 @@
 </form>
 
 <a href="/">Back to endpoints</a>
+
+<h2>TLS</h2>
+
+{{ if .Endpoint.LastCheck.TLS.Enabled }}
+    <p>Valid: {{ .Endpoint.LastCheck.TLS.Valid }}</p>
+    <p>Expires: {{ .Endpoint.LastCheck.TLS.ExpiresAt }}</p>
+    <p>Days remaining: {{ .Endpoint.LastCheck.TLS.DaysRemaining }}</p>
+{{ else }}
+    <p>TLS not enabled</p>
+{{ end }}

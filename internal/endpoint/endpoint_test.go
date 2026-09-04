@@ -123,17 +123,28 @@ func TestAddValidEndpoint(t *testing.T) {
 		}, nil
 	}
 
+	wantHTTPResult := probe.Result{
+		StatusCode: http.StatusOK,
+		Latency:    50 * time.Millisecond,
+		Available:  true,
+	}
+
 	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
-		return probe.Result{
-			StatusCode: http.StatusOK,
-			Latency:    50 * time.Millisecond,
-			Available:  true,
-		}, nil
+		return wantHTTPResult, nil
+	}
+
+	wantTLSResult := probe.TLSResult{
+		Enabled: true,
+		Valid:   true,
+	}
+
+	store.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		return wantTLSResult, nil
 	}
 
 	wantURL := "https://example.com/"
 
-	endpoint, result, err := store.Add(wantURL)
+	endpoint, err := store.Add(wantURL)
 	if err != nil {
 		t.Fatalf("Add() unexpected error = %v", err)
 	}
@@ -142,20 +153,20 @@ func TestAddValidEndpoint(t *testing.T) {
 		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, wantURL)
 	}
 
-	if result.StatusCode != http.StatusOK {
-		t.Errorf("Add() result.StatusCode = %d, want %d", result.StatusCode, http.StatusOK)
+	if endpoint.LastCheck.HTTP != wantHTTPResult {
+		t.Errorf("Add() endpoint.LastCheck.HTTP = %+v, want %+v", endpoint.LastCheck.HTTP, wantHTTPResult)
 	}
 
-	if !result.Available {
-		t.Error("Add() result.Available = false, want true")
+	if store.endpoints[0].LastCheck.HTTP != wantHTTPResult {
+		t.Errorf("Add() stored LastCheck.HTTP = %+v, want %+v", store.endpoints[0].LastCheck.HTTP, wantHTTPResult)
 	}
 
-	if result.Latency != 50*time.Millisecond {
-		t.Errorf("Add() result.Latency = %v, want %v", result.Latency, 50*time.Millisecond)
+	if endpoint.LastCheck.TLS != wantTLSResult {
+		t.Errorf("Add() endpoint.LastCheck.TLS = %+v, want %+v", endpoint.LastCheck.TLS, wantTLSResult)
 	}
 
-	if store.endpoints[0].LastResult != result {
-		t.Errorf("Add() stored LastResult = %+v, want %+v", store.endpoints[0].LastResult, result)
+	if store.endpoints[0].LastCheck.TLS != wantTLSResult {
+		t.Errorf("Add() stored LastCheck.TLS = %+v, want %+v", store.endpoints[0].LastCheck.TLS, wantTLSResult)
 	}
 
 	if len(store.endpoints) != 1 {
@@ -170,7 +181,7 @@ func TestAddValidEndpoint(t *testing.T) {
 func TestAddInvalidEndpoint(t *testing.T) {
 	store := NewStore()
 
-	endpoint, result, err := store.Add("example.com")
+	endpoint, err := store.Add("example.com")
 
 	if !errors.Is(err, ErrUnsupportedScheme) {
 		t.Fatalf("Add() error = %v, want %v", err, ErrUnsupportedScheme)
@@ -178,10 +189,6 @@ func TestAddInvalidEndpoint(t *testing.T) {
 
 	if endpoint != (Endpoint{}) {
 		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
-	}
-
-	if result != (probe.Result{}) {
-		t.Errorf("Add() result = %+v, want empty Result", result)
 	}
 
 	if len(store.endpoints) != 0 {
@@ -200,17 +207,28 @@ func TestAddUnreachableEndpoint(t *testing.T) {
 
 	unreachableErr := errors.New("endpoint unreachable")
 
+	wantHTTPResult := probe.Result{
+		StatusCode: 0,
+		Latency:    50 * time.Millisecond,
+		Available:  false,
+	}
+
 	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
-		return probe.Result{
-			StatusCode: 0,
-			Latency:    50 * time.Millisecond,
-			Available:  false,
-		}, unreachableErr
+		return wantHTTPResult, unreachableErr
+	}
+
+	wantTLSResult := probe.TLSResult{
+		Enabled: true,
+		Valid:   true,
+	}
+
+	store.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		return wantTLSResult, nil
 	}
 
 	wantURL := "https://example.com/"
 
-	endpoint, result, err := store.Add(wantURL)
+	endpoint, err := store.Add(wantURL)
 
 	if !errors.Is(err, unreachableErr) {
 		t.Fatalf("Add() error = %v, want %v", err, unreachableErr)
@@ -220,16 +238,12 @@ func TestAddUnreachableEndpoint(t *testing.T) {
 		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, wantURL)
 	}
 
-	if result.StatusCode != 0 {
-		t.Errorf("Add() result.StatusCode = %d, want 0", result.StatusCode)
+	if endpoint.LastCheck.HTTP != wantHTTPResult {
+		t.Errorf("Add() endpoint.LastCheck.HTTP = %+v, want %+v", endpoint.LastCheck.HTTP, wantHTTPResult)
 	}
 
-	if result.Available {
-		t.Error("Add() result.Available = true, want false")
-	}
-
-	if result.Latency != 50*time.Millisecond {
-		t.Errorf("Add() result.Latency = %v, want %v", result.Latency, 50*time.Millisecond)
+	if endpoint.LastCheck.TLS != wantTLSResult {
+		t.Errorf("Add() endpoint.LastCheck.TLS = %+v, want %+v", endpoint.LastCheck.TLS, wantTLSResult)
 	}
 
 	if len(store.endpoints) != 1 {
@@ -254,12 +268,19 @@ func TestAddDuplicateEndpoint(t *testing.T) {
 		}, nil
 	}
 
-	_, _, err := store.Add("https://example.com")
+	store.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		return probe.TLSResult{
+			Enabled: true,
+			Valid:   true,
+		}, nil
+	}
+
+	_, err := store.Add("https://example.com")
 	if err != nil {
 		t.Fatalf("Add() unexpected error = %v", err)
 	}
 
-	endpoint, result, err := store.Add("https://EXAMPLE.COM/")
+	endpoint, err := store.Add("https://EXAMPLE.COM/")
 
 	if !errors.Is(err, ErrEndpointExists) {
 		t.Fatalf("Add() error = %v, want %v", err, ErrEndpointExists)
@@ -267,10 +288,6 @@ func TestAddDuplicateEndpoint(t *testing.T) {
 
 	if endpoint != (Endpoint{}) {
 		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
-	}
-
-	if result != (probe.Result{}) {
-		t.Errorf("Add() result = %+v, want empty Result", result)
 	}
 
 	if len(store.endpoints) != 1 {
@@ -285,7 +302,7 @@ func TestAddUnsafeEndpoint(t *testing.T) {
 		return nil, probe.ErrUnsafeHost
 	}
 
-	endpoint, result, err := store.Add("https://example.com/")
+	endpoint, err := store.Add("https://example.com/")
 
 	if !errors.Is(err, probe.ErrUnsafeHost) {
 		t.Fatalf("Add() error = %v, want %v", err, probe.ErrUnsafeHost)
@@ -295,12 +312,130 @@ func TestAddUnsafeEndpoint(t *testing.T) {
 		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
 	}
 
-	if result != (probe.Result{}) {
-		t.Errorf("Add() result = %+v, want empty Result", result)
-	}
-
 	if len(store.endpoints) != 0 {
 		t.Errorf("Add() store size = %d, want 0", len(store.endpoints))
+	}
+}
+
+func TestAddConcurrentDuplicateEndpoint(t *testing.T) {
+	store := NewStore()
+
+	store.validateHost = func(string) ([]netip.Addr, error) {
+		return []netip.Addr{
+			netip.MustParseAddr("93.184.216.34"),
+		}, nil
+	}
+
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		time.Sleep(50 * time.Millisecond)
+
+		return probe.Result{
+			StatusCode: http.StatusOK,
+			Available:  true,
+		}, nil
+	}
+
+	store.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		return probe.TLSResult{
+			Enabled: true,
+			Valid:   true,
+		}, nil
+	}
+
+	const attempts = 10
+
+	var wg sync.WaitGroup
+	wg.Add(attempts)
+
+	errorsCh := make(chan error, attempts)
+
+	for range attempts {
+		go func() {
+			defer wg.Done()
+
+			_, err := store.Add("https://example.com/")
+			errorsCh <- err
+		}()
+	}
+
+	wg.Wait()
+	close(errorsCh)
+
+	var successCount int
+	var duplicateCount int
+
+	for err := range errorsCh {
+		switch {
+		case err == nil:
+			successCount++
+
+		case errors.Is(err, ErrEndpointExists):
+			duplicateCount++
+
+		default:
+			t.Fatalf("Add() unexpected error = %v", err)
+		}
+	}
+
+	if successCount != 1 {
+		t.Errorf("Add() success count = %d, want 1", successCount)
+	}
+
+	if duplicateCount != attempts-1 {
+		t.Errorf("Add() duplicate count = %d, want %d", duplicateCount, attempts-1)
+	}
+
+	if len(store.List()) != 1 {
+		t.Errorf("Add() store size = %d, want 1", len(store.List()))
+	}
+}
+
+func TestAddInvalidTLS(t *testing.T) {
+	store := NewStore()
+
+	store.validateHost = func(string) ([]netip.Addr, error) {
+		return []netip.Addr{
+			netip.MustParseAddr("93.184.216.34"),
+		}, nil
+	}
+
+	wantHTTPResult := probe.Result{
+		StatusCode: http.StatusOK,
+		Latency:    50 * time.Millisecond,
+		Available:  true,
+	}
+
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		return wantHTTPResult, nil
+	}
+
+	tlsErr := errors.New("invalid TLS certificate")
+
+	wantTLSResult := probe.TLSResult{
+		Enabled: true,
+		Valid:   false,
+	}
+
+	store.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		return wantTLSResult, tlsErr
+	}
+
+	endpoint, err := store.Add("https://example.com/")
+
+	if !errors.Is(err, tlsErr) {
+		t.Fatalf("Add() error = %v, want %v", err, tlsErr)
+	}
+
+	if endpoint.LastCheck.HTTP != wantHTTPResult {
+		t.Errorf("Add() endpoint.LastCheck.HTTP = %+v, want %+v", endpoint.LastCheck.HTTP, wantHTTPResult)
+	}
+
+	if endpoint.LastCheck.TLS != wantTLSResult {
+		t.Errorf("Add() endpoint.LastCheck.TLS = %+v, want %+v", endpoint.LastCheck.TLS, wantTLSResult)
+	}
+
+	if len(store.List()) != 1 {
+		t.Errorf("Add() store size = %d, want 1", len(store.List()))
 	}
 }
 
@@ -437,10 +572,12 @@ func TestRefreshEndpoint(t *testing.T) {
 		{
 			ID:  id,
 			URL: "https://example.com/",
-			LastResult: probe.Result{
-				StatusCode: http.StatusOK,
-				Latency:    20 * time.Millisecond,
-				Available:  true,
+			LastCheck: CheckResult{
+				HTTP: probe.Result{
+					StatusCode: http.StatusOK,
+					Latency:    20 * time.Millisecond,
+					Available:  true,
+				},
 			},
 		},
 	}
@@ -451,41 +588,55 @@ func TestRefreshEndpoint(t *testing.T) {
 		}, nil
 	}
 
-	wantResult := probe.Result{
+	wantHTTPResult := probe.Result{
 		StatusCode: http.StatusServiceUnavailable,
 		Latency:    80 * time.Millisecond,
 		Available:  true,
 	}
 
-	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
-		return wantResult, nil
+	wantTLSResult := probe.TLSResult{
+		Enabled: true,
+		Valid:   true,
 	}
 
-	result, err := store.Refresh(id)
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		return wantHTTPResult, nil
+	}
+
+	store.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		return wantTLSResult, nil
+	}
+
+	wantCheck := CheckResult{
+		HTTP: wantHTTPResult,
+		TLS:  wantTLSResult,
+	}
+
+	check, err := store.Refresh(id)
 	if err != nil {
 		t.Fatalf("Refresh() unexpected error = %v", err)
 	}
 
-	if result != wantResult {
-		t.Errorf("Refresh() result = %+v, want %+v", result, wantResult)
+	if check != wantCheck {
+		t.Errorf("Refresh() check = %+v, want %+v", check, wantCheck)
 	}
 
-	if store.endpoints[0].LastResult != wantResult {
-		t.Errorf("Refresh() stored LastResult = %+v, want %+v", store.endpoints[0].LastResult, wantResult)
+	if store.endpoints[0].LastCheck != wantCheck {
+		t.Errorf("Refresh() stored LastCheck = %+v, want %+v", store.endpoints[0].LastCheck, wantCheck)
 	}
 }
 
 func TestRefreshEndpointNotFound(t *testing.T) {
 	store := NewStore()
 
-	result, err := store.Refresh(uuid.NewV7())
+	check, err := store.Refresh(uuid.NewV7())
 
 	if !errors.Is(err, ErrEndpointNotFound) {
 		t.Fatalf("Refresh() error = %v, want %v", err, ErrEndpointNotFound)
 	}
 
-	if result != (probe.Result{}) {
-		t.Errorf("Refresh() result = %+v, want empty Result", result)
+	if check != (CheckResult{}) {
+		t.Errorf("Refresh() check = %+v, want empty CheckResult", check)
 	}
 }
 
@@ -498,10 +649,12 @@ func TestRefreshUnreachableEndpoint(t *testing.T) {
 		{
 			ID:  id,
 			URL: "https://example.com/",
-			LastResult: probe.Result{
-				StatusCode: http.StatusOK,
-				Latency:    20 * time.Millisecond,
-				Available:  true,
+			LastCheck: CheckResult{
+				HTTP: probe.Result{
+					StatusCode: http.StatusOK,
+					Latency:    20 * time.Millisecond,
+					Available:  true,
+				},
 			},
 		},
 	}
@@ -514,93 +667,41 @@ func TestRefreshUnreachableEndpoint(t *testing.T) {
 
 	unreachableErr := errors.New("endpoint unreachable")
 
-	wantResult := probe.Result{
+	wantHTTPResult := probe.Result{
 		StatusCode: 0,
 		Latency:    80 * time.Millisecond,
 		Available:  false,
 	}
 
-	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
-		return wantResult, unreachableErr
+	wantTLSResult := probe.TLSResult{
+		Enabled: true,
+		Valid:   true,
 	}
 
-	result, err := store.Refresh(id)
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		return wantHTTPResult, unreachableErr
+	}
+
+	store.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		return wantTLSResult, nil
+	}
+
+	wantCheck := CheckResult{
+		HTTP: wantHTTPResult,
+		TLS:  wantTLSResult,
+	}
+
+	check, err := store.Refresh(id)
 
 	if !errors.Is(err, unreachableErr) {
 		t.Fatalf("Refresh() error = %v, want %v", err, unreachableErr)
 	}
 
-	if result != wantResult {
-		t.Errorf("Refresh() result = %+v, want %+v", result, wantResult)
+	if check != wantCheck {
+		t.Errorf("Refresh() check = %+v, want %+v", check, wantCheck)
 	}
 
-	if store.endpoints[0].LastResult != wantResult {
-		t.Errorf("Refresh() stored LastResult = %+v, want %+v", store.endpoints[0].LastResult, wantResult)
-	}
-}
-
-func TestAddConcurrentDuplicateEndpoint(t *testing.T) {
-	store := NewStore()
-
-	store.validateHost = func(string) ([]netip.Addr, error) {
-		return []netip.Addr{
-			netip.MustParseAddr("93.184.216.34"),
-		}, nil
-	}
-
-	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
-		time.Sleep(50 * time.Millisecond)
-
-		return probe.Result{
-			StatusCode: http.StatusOK,
-			Available:  true,
-		}, nil
-	}
-
-	const attempts = 10
-
-	var wg sync.WaitGroup
-	wg.Add(attempts)
-
-	errorsCh := make(chan error, attempts)
-
-	for range attempts {
-		go func() {
-			defer wg.Done()
-
-			_, _, err := store.Add("https://example.com/")
-			errorsCh <- err
-		}()
-	}
-
-	wg.Wait()
-	close(errorsCh)
-
-	var successCount int
-	var duplicateCount int
-
-	for err := range errorsCh {
-		switch {
-		case err == nil:
-			successCount++
-
-		case errors.Is(err, ErrEndpointExists):
-			duplicateCount++
-
-		default:
-			t.Fatalf("Add() unexpected error = %v", err)
-		}
-	}
-
-	if successCount != 1 {
-		t.Errorf("Add() success count = %d, want 1", successCount)
-	}
-
-	if duplicateCount != attempts-1 {
-		t.Errorf("Add() duplicate count = %d, want %d", duplicateCount, attempts-1)
-	}
-
-	if len(store.List()) != 1 {
-		t.Errorf("Add() store size = %d, want 1", len(store.List()))
+	if store.endpoints[0].LastCheck != wantCheck {
+		t.Errorf("Refresh() stored LastCheck = %+v, want %+v", store.endpoints[0].LastCheck, wantCheck)
 	}
 }
