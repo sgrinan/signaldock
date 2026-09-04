@@ -225,6 +225,7 @@ func tlsProbe(parsedURL *url.URL, ips []netip.Addr, rootCAs *x509.CertPool) (TLS
 
 		return TLSResult{
 			Enabled:       true,
+			Valid:         true,
 			ExpiresAt:     expiresAt,
 			DaysRemaining: daysRemaining,
 		}, nil

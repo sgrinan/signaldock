@@ -242,6 +242,8 @@ func TestGetEndpoint(t *testing.T) {
 	id := uuid.NewV7()
 	wantURL := "https://example.com/"
 
+	expiresAt := time.Date(2026, time.October, 23, 0, 0, 0, 0, time.UTC)
+
 	store := &fakeStore{
 		endpoints: []endpoint.Endpoint{
 			{
@@ -254,8 +256,10 @@ func TestGetEndpoint(t *testing.T) {
 						Available:  true,
 					},
 					TLS: probe.TLSResult{
-						Enabled: true,
-						Valid:   true,
+						Enabled:       true,
+						Valid:         true,
+						ExpiresAt:     expiresAt,
+						DaysRemaining: 49,
 					},
 				},
 			},
@@ -291,6 +295,22 @@ func TestGetEndpoint(t *testing.T) {
 		if !strings.Contains(body, "true") {
 			t.Errorf("GET /endpoints/{id} body = %q, want available true", body)
 		}
+
+		if !strings.Contains(body, "Enabled: true") {
+			t.Errorf("GET /endpoints/{id} body = %q, want TLS enabled", body)
+		}
+
+		if !strings.Contains(body, "Valid: true") {
+			t.Errorf("GET /endpoints/{id} body = %q, want TLS valid", body)
+		}
+
+		if !strings.Contains(body, "23 Oct 2026") {
+			t.Errorf("GET /endpoints/{id} body = %q, want TLS expiration date", body)
+		}
+
+		if !strings.Contains(body, "Days remaining: 49") {
+			t.Errorf("GET /endpoints/{id} body = %q, want TLS days remaining", body)
+		}
 	})
 
 	t.Run("invalid ID", func(t *testing.T) {
@@ -313,6 +333,112 @@ func TestGetEndpoint(t *testing.T) {
 
 		if recorder.Code != http.StatusNotFound {
 			t.Errorf("GET /endpoints/{id} status = %d, want %d", recorder.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("TLS not enabled", func(t *testing.T) {
+		id := uuid.NewV7()
+
+		store := &fakeStore{
+			endpoints: []endpoint.Endpoint{
+				{
+					ID:  id,
+					URL: "http://example.com/",
+					LastCheck: endpoint.CheckResult{
+						HTTP: probe.Result{
+							StatusCode: http.StatusOK,
+							Latency:    50 * time.Millisecond,
+							Available:  true,
+						},
+						TLS: probe.TLSResult{
+							Enabled: false,
+						},
+					},
+				},
+			},
+		}
+
+		handler, err := NewHandler(store, logger)
+		if err != nil {
+			t.Fatalf("NewHandler() unexpected error = %v", err)
+		}
+
+		request := httptest.NewRequest(
+			http.MethodGet,
+			"/endpoints/"+id.String(),
+			nil,
+		)
+
+		recorder := httptest.NewRecorder()
+
+		handler.ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusOK {
+			t.Errorf(
+				"GET /endpoints/{id} status = %d, want %d",
+				recorder.Code,
+				http.StatusOK,
+			)
+		}
+
+		body := recorder.Body.String()
+
+		if !strings.Contains(body, "TLS not enabled") {
+			t.Errorf(
+				"GET /endpoints/{id} body = %q, want TLS not enabled",
+				body,
+			)
+		}
+	})
+
+	t.Run("invalid TLS", func(t *testing.T) {
+		id := uuid.NewV7()
+
+		store := &fakeStore{
+			endpoints: []endpoint.Endpoint{
+				{
+					ID:  id,
+					URL: "https://example.com/",
+					LastCheck: endpoint.CheckResult{
+						HTTP: probe.Result{
+							StatusCode: http.StatusOK,
+							Latency:    50 * time.Millisecond,
+							Available:  true,
+						},
+						TLS: probe.TLSResult{
+							Enabled: true,
+							Valid:   false,
+						},
+					},
+				},
+			},
+		}
+
+		handler, err := NewHandler(store, logger)
+		if err != nil {
+			t.Fatalf("NewHandler() unexpected error = %v", err)
+		}
+
+		request := httptest.NewRequest(http.MethodGet, "/endpoints/"+id.String(), nil)
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusOK {
+			t.Errorf("GET /endpoints/{id} status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+
+		body := recorder.Body.String()
+
+		if !strings.Contains(body, "Valid: false") {
+			t.Errorf("GET /endpoints/{id} body = %q, want TLS invalid", body)
+		}
+
+		if strings.Contains(body, "Expires:") {
+			t.Errorf("GET /endpoints/{id} body = %q, do not want TLS expiration date", body)
+		}
+
+		if strings.Contains(body, "Days remaining:") {
+			t.Errorf("GET /endpoints/{id} body = %q, do not want TLS days remaining", body)
 		}
 	})
 }

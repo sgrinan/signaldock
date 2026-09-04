@@ -17,9 +17,17 @@
 <h2>TLS</h2>
 
 {{ if .Endpoint.LastCheck.TLS.Enabled }}
+
+    <p>Enabled: true</p>
     <p>Valid: {{ .Endpoint.LastCheck.TLS.Valid }}</p>
-    <p>Expires: {{ .Endpoint.LastCheck.TLS.ExpiresAt }}</p>
-    <p>Days remaining: {{ .Endpoint.LastCheck.TLS.DaysRemaining }}</p>
+
+    {{ if .Endpoint.LastCheck.TLS.Valid }}
+        <p>Expires: {{ .TLSExpiresAt }}</p>
+        <p>Days remaining: {{ .Endpoint.LastCheck.TLS.DaysRemaining }}</p>
+    {{ end }}
+
 {{ else }}
+
     <p>TLS not enabled</p>
+
 {{ end }}

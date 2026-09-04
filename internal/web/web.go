@@ -29,6 +29,7 @@ type EndpointPageData struct {
 	CSRFToken     string
 	LatencyMS     int64
 	LastCheckedAt string
+	TLSExpiresAt  string
 }
 
 type EndpointStore interface {
@@ -181,11 +182,18 @@ func handleGetEndpoint(store EndpointStore, tmpl *template.Template, logger *slo
 
 		csrfToken := generateCSRFToken()
 
+		tlsExpiresAt := ""
+
+		if !ep.LastCheck.TLS.ExpiresAt.IsZero() {
+			tlsExpiresAt = ep.LastCheck.TLS.ExpiresAt.Format("02 Jan 2006")
+		}
+
 		pageData := EndpointPageData{
 			Endpoint:      ep,
 			CSRFToken:     csrfToken,
 			LatencyMS:     ep.LastCheck.HTTP.Latency.Milliseconds(),
 			LastCheckedAt: ep.LastCheck.HTTP.CheckedAt.Format("15:04:05"),
+			TLSExpiresAt:  tlsExpiresAt,
 		}
 
 		http.SetCookie(w, &http.Cookie{

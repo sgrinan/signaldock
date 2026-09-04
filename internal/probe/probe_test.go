@@ -429,6 +429,10 @@ func TestTLSValidCertificate(t *testing.T) {
 		t.Error("tlsProbe() Enabled = false, want true")
 	}
 
+	if !result.Valid {
+		t.Error("tlsProbe() Valid = false, want true")
+	}
+
 	if result.ExpiresAt.IsZero() {
 		t.Fatal("tlsProbe() ExpiresAt is zero")
 	}
