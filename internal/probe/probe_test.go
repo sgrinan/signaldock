@@ -82,104 +82,6 @@ func TestValidateHost(t *testing.T) {
 	}
 }
 
-func TestGetStatusCode(t *testing.T) {
-	tests := []struct {
-		name       string
-		statusCode int
-	}{
-		{
-			name:       "returns status 200",
-			statusCode: http.StatusOK,
-		},
-		{
-			name:       "returns status 503",
-			statusCode: http.StatusServiceUnavailable,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(
-				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(tt.statusCode)
-				}),
-			)
-			defer server.Close()
-
-			parsedURL, err := url.Parse(server.URL)
-			if err != nil {
-				t.Fatalf("ParseURL() unexpected error = %v", err)
-			}
-
-			ips := []netip.Addr{
-				netip.MustParseAddr(parsedURL.Hostname()),
-			}
-
-			statusCode, err := GetStatusCode(parsedURL, ips)
-			if err != nil {
-				t.Fatalf("GetStatusCode() unexpected error = %v", err)
-			}
-
-			if statusCode != tt.statusCode {
-				t.Errorf("GetStatusCode() = %d, want %d", statusCode, tt.statusCode)
-			}
-		})
-	}
-}
-
-func TestGetStatusCodeEndpointUnreachable(t *testing.T) {
-	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
-	)
-
-	parsedURL, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatalf("ParseURL() unexpected error = %v", err)
-	}
-
-	server.Close()
-
-	ips := []netip.Addr{
-		netip.MustParseAddr(parsedURL.Hostname()),
-	}
-
-	statusCode, err := GetStatusCode(parsedURL, ips)
-	if err == nil {
-		t.Fatal("GetStatusCode() error = nil, want error")
-	}
-
-	if statusCode != 0 {
-		t.Errorf("GetStatusCode() = %d, want 0", statusCode)
-	}
-}
-
-func TestGetStatusCodeUnsafeRedirect(t *testing.T) {
-	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "http://127.0.0.1/", http.StatusFound)
-		}),
-	)
-	defer server.Close()
-
-	parsedURL, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatalf("url.Parse() unexpected error = %v", err)
-	}
-
-	ips := []netip.Addr{
-		netip.MustParseAddr(parsedURL.Hostname()),
-	}
-
-	statusCode, err := GetStatusCode(parsedURL, ips)
-	if !errors.Is(err, ErrUnsafeHost) {
-		t.Fatalf("GetStatusCode() error = %v, want %v", err, ErrUnsafeHost)
-	}
-
-	if statusCode != 0 {
-		t.Errorf("GetStatusCode() = %d, want 0", statusCode)
-	}
-}
-
 func TestHTTP(t *testing.T) {
 	t.Run("HTTP 200", func(t *testing.T) {
 		server := httptest.NewServer(
@@ -284,4 +186,48 @@ func TestHTTP(t *testing.T) {
 			t.Errorf("HTTP() Latency = %v, want > 0", result.Latency)
 		}
 	})
+}
+
+func TestHTTPUnsafeRedirect(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "http://127.0.0.1/", http.StatusFound)
+		}),
+	)
+	defer server.Close()
+
+	parsedURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("url.Parse() unexpected error = %v", err)
+	}
+
+	ips := []netip.Addr{
+		netip.MustParseAddr(parsedURL.Hostname()),
+	}
+
+	result, err := HTTP(parsedURL, ips)
+	if !errors.Is(err, ErrUnsafeHost) {
+		t.Fatalf("HTTP() error = %v, want %v", err, ErrUnsafeHost)
+	}
+
+	if result.Available {
+		t.Error("HTTP() Available = true, want false")
+	}
+}
+
+func TestHTTPNoIPs(t *testing.T) {
+	parsedURL, err := url.Parse("https://example.com/")
+	if err != nil {
+		t.Fatalf("url.Parse() unexpected error = %v", err)
+	}
+
+	result, err := HTTP(parsedURL, nil)
+
+	if !errors.Is(err, ErrUnsafeHost) {
+		t.Fatalf("HTTP() error = %v, want %v", err, ErrUnsafeHost)
+	}
+
+	if result != (Result{}) {
+		t.Errorf("HTTP() result = %+v, want empty Result", result)
+	}
 }

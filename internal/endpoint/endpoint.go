@@ -25,9 +25,9 @@ type Endpoint struct {
 }
 
 type Store struct {
-	endpoints     []Endpoint
-	validateHost  func(string) ([]netip.Addr, error)
-	getStatusCode func(*url.URL, []netip.Addr) (int, error)
+	endpoints    []Endpoint
+	validateHost func(string) ([]netip.Addr, error)
+	probeHTTP    func(*url.URL, []netip.Addr) (probe.Result, error)
 }
 
 func ParseURL(rawURL string) (*url.URL, error) {
@@ -68,24 +68,24 @@ func ParseURL(rawURL string) (*url.URL, error) {
 
 func NewStore() *Store {
 	return &Store{
-		validateHost:  probe.ValidateHost,
-		getStatusCode: probe.GetStatusCode,
+		validateHost: probe.ValidateHost,
+		probeHTTP:    probe.HTTP,
 	}
 }
 
-func (store *Store) Add(rawURL string) (Endpoint, int, error) {
+func (store *Store) Add(rawURL string) (Endpoint, probe.Result, error) {
 	parsedURL, err := ParseURL(rawURL)
 	if err != nil {
-		return Endpoint{}, 0, err
+		return Endpoint{}, probe.Result{}, err
 	}
 
 	ips, err := store.validateHost(parsedURL.Hostname())
 	if err != nil {
-		return Endpoint{}, 0, err
+		return Endpoint{}, probe.Result{}, err
 	}
 
 	if store.Exists(parsedURL.String()) {
-		return Endpoint{}, 0, ErrEndpointExists
+		return Endpoint{}, probe.Result{}, ErrEndpointExists
 	}
 
 	id := uuid.NewV7()
@@ -95,15 +95,15 @@ func (store *Store) Add(rawURL string) (Endpoint, int, error) {
 		URL: parsedURL.String(),
 	}
 
-	statusCode, err := store.getStatusCode(parsedURL, ips)
+	result, err := store.probeHTTP(parsedURL, ips)
 	if err != nil {
 		store.endpoints = append(store.endpoints, endpoint)
-		return endpoint, 0, err
+		return endpoint, result, err
 	}
 
 	store.endpoints = append(store.endpoints, endpoint)
 
-	return endpoint, statusCode, nil
+	return endpoint, result, nil
 }
 
 func (store *Store) List() []Endpoint {

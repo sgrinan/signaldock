@@ -59,16 +59,6 @@ func ValidateHost(host string) ([]netip.Addr, error) {
 	return ips, nil
 }
 
-func GetStatusCode(parsedURL *url.URL, ips []netip.Addr) (int, error) {
-	resp, _, err := doRequest(parsedURL, ips)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	return resp.StatusCode, nil
-}
-
 func newHTTPClient(parsedURL *url.URL, ips []netip.Addr) (*http.Client, error) {
 	if len(ips) == 0 {
 		return nil, ErrUnsafeHost
@@ -150,7 +140,7 @@ func HTTP(parsedURL *url.URL, ips []netip.Addr) (Result, error) {
 	resp, latency, err := doRequest(parsedURL, ips)
 	if err != nil {
 		return Result{
-			Latency: latency,
+			Latency:   latency,
 			Available: false,
 		}, err
 	}
@@ -158,7 +148,7 @@ func HTTP(parsedURL *url.URL, ips []netip.Addr) (Result, error) {
 
 	return Result{
 		StatusCode: resp.StatusCode,
-		Latency: latency,
-		Available: true,
+		Latency:    latency,
+		Available:  true,
 	}, nil
 }

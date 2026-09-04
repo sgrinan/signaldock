@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"net/url"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/probe"
@@ -121,13 +122,17 @@ func TestAddValidEndpoint(t *testing.T) {
 		}, nil
 	}
 
-	store.getStatusCode = func(*url.URL, []netip.Addr) (int, error) {
-		return http.StatusOK, nil
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		return probe.Result{
+			StatusCode: http.StatusOK,
+			Latency:    50 * time.Millisecond,
+			Available:  true,
+		}, nil
 	}
 
 	wantURL := "https://example.com/"
 
-	endpoint, statusCode, err := store.Add(wantURL)
+	endpoint, result, err := store.Add(wantURL)
 	if err != nil {
 		t.Fatalf("Add() unexpected error = %v", err)
 	}
@@ -136,8 +141,16 @@ func TestAddValidEndpoint(t *testing.T) {
 		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, wantURL)
 	}
 
-	if statusCode != http.StatusOK {
-		t.Errorf("Add() statusCode = %d, want %d", statusCode, http.StatusOK)
+	if result.StatusCode != http.StatusOK {
+		t.Errorf("Add() result.StatusCode = %d, want %d", result.StatusCode, http.StatusOK)
+	}
+
+	if !result.Available {
+		t.Error("Add() result.Available = false, want true")
+	}
+
+	if result.Latency != 50*time.Millisecond {
+		t.Errorf("Add() result.Latency = %v, want %v", result.Latency, 50*time.Millisecond)
 	}
 
 	if len(store.endpoints) != 1 {
@@ -152,7 +165,7 @@ func TestAddValidEndpoint(t *testing.T) {
 func TestAddInvalidEndpoint(t *testing.T) {
 	store := NewStore()
 
-	endpoint, statusCode, err := store.Add("example.com")
+	endpoint, result, err := store.Add("example.com")
 
 	if !errors.Is(err, ErrUnsupportedScheme) {
 		t.Fatalf("Add() error = %v, want %v", err, ErrUnsupportedScheme)
@@ -162,8 +175,8 @@ func TestAddInvalidEndpoint(t *testing.T) {
 		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
 	}
 
-	if statusCode != 0 {
-		t.Errorf("Add() statusCode = %d, want 0", statusCode)
+	if result != (probe.Result{}) {
+		t.Errorf("Add() result = %+v, want empty Result", result)
 	}
 
 	if len(store.endpoints) != 0 {
@@ -182,13 +195,17 @@ func TestAddUnreachableEndpoint(t *testing.T) {
 
 	unreachableErr := errors.New("endpoint unreachable")
 
-	store.getStatusCode = func(*url.URL, []netip.Addr) (int, error) {
-		return 0, unreachableErr
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		return probe.Result{
+			StatusCode: 0,
+			Latency:    50 * time.Millisecond,
+			Available:  false,
+		}, unreachableErr
 	}
 
 	wantURL := "https://example.com/"
 
-	endpoint, statusCode, err := store.Add(wantURL)
+	endpoint, result, err := store.Add(wantURL)
 
 	if !errors.Is(err, unreachableErr) {
 		t.Fatalf("Add() error = %v, want %v", err, unreachableErr)
@@ -198,8 +215,16 @@ func TestAddUnreachableEndpoint(t *testing.T) {
 		t.Errorf("Add() endpoint.URL = %q, want %q", endpoint.URL, wantURL)
 	}
 
-	if statusCode != 0 {
-		t.Errorf("Add() statusCode = %d, want 0", statusCode)
+	if result.StatusCode != 0 {
+		t.Errorf("Add() result.StatusCode = %d, want 0", result.StatusCode)
+	}
+
+	if result.Available {
+		t.Error("Add() result.Available = true, want false")
+	}
+
+	if result.Latency != 50*time.Millisecond {
+		t.Errorf("Add() result.Latency = %v, want %v", result.Latency, 50*time.Millisecond)
 	}
 
 	if len(store.endpoints) != 1 {
@@ -216,8 +241,12 @@ func TestAddDuplicateEndpoint(t *testing.T) {
 		}, nil
 	}
 
-	store.getStatusCode = func(*url.URL, []netip.Addr) (int, error) {
-		return http.StatusOK, nil
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		return probe.Result{
+			StatusCode: http.StatusOK,
+			Latency:    50 * time.Millisecond,
+			Available:  true,
+		}, nil
 	}
 
 	_, _, err := store.Add("https://example.com")
@@ -225,7 +254,7 @@ func TestAddDuplicateEndpoint(t *testing.T) {
 		t.Fatalf("Add() unexpected error = %v", err)
 	}
 
-	endpoint, statusCode, err := store.Add("https://EXAMPLE.COM/")
+	endpoint, result, err := store.Add("https://EXAMPLE.COM/")
 
 	if !errors.Is(err, ErrEndpointExists) {
 		t.Fatalf("Add() error = %v, want %v", err, ErrEndpointExists)
@@ -235,8 +264,8 @@ func TestAddDuplicateEndpoint(t *testing.T) {
 		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
 	}
 
-	if statusCode != 0 {
-		t.Errorf("Add() statusCode = %d, want 0", statusCode)
+	if result != (probe.Result{}) {
+		t.Errorf("Add() result = %+v, want empty Result", result)
 	}
 
 	if len(store.endpoints) != 1 {
@@ -251,7 +280,7 @@ func TestAddUnsafeEndpoint(t *testing.T) {
 		return nil, probe.ErrUnsafeHost
 	}
 
-	endpoint, statusCode, err := store.Add("https://example.com/")
+	endpoint, result, err := store.Add("https://example.com/")
 
 	if !errors.Is(err, probe.ErrUnsafeHost) {
 		t.Fatalf("Add() error = %v, want %v", err, probe.ErrUnsafeHost)
@@ -261,8 +290,8 @@ func TestAddUnsafeEndpoint(t *testing.T) {
 		t.Errorf("Add() endpoint = %+v, want empty Endpoint", endpoint)
 	}
 
-	if statusCode != 0 {
-		t.Errorf("Add() statusCode = %d, want 0", statusCode)
+	if result != (probe.Result{}) {
+		t.Errorf("Add() result = %+v, want empty Result", result)
 	}
 
 	if len(store.endpoints) != 0 {

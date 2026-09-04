@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/endpoint"
+	"github.com/sgrinan/signaldock/internal/probe"
 )
 
 type fakeStore struct {
@@ -41,7 +42,7 @@ func (store *fakeStore) RemoveByID(id uuid.UUID) bool {
 	return false
 }
 
-func (store *fakeStore) Add(rawURL string) (endpoint.Endpoint, int, error) {
+func (store *fakeStore) Add(rawURL string) (endpoint.Endpoint, probe.Result, error) {
 	ep := endpoint.Endpoint{
 		ID:  uuid.NewV7(),
 		URL: rawURL,
@@ -49,7 +50,10 @@ func (store *fakeStore) Add(rawURL string) (endpoint.Endpoint, int, error) {
 
 	store.endpoints = append(store.endpoints, ep)
 
-	return ep, http.StatusOK, nil
+	return ep, probe.Result{
+		StatusCode: http.StatusOK,
+		Available:  true,
+	}, nil
 }
 
 func TestGetIndex(t *testing.T) {

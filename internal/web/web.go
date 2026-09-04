@@ -25,7 +25,7 @@ type PageData struct {
 }
 
 type EndpointStore interface {
-	Add(string) (endpoint.Endpoint, int, error)
+	Add(string) (endpoint.Endpoint, probe.Result, error)
 	List() []endpoint.Endpoint
 	GetByID(uuid.UUID) (endpoint.Endpoint, bool)
 	RemoveByID(uuid.UUID) bool
