@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/endpoint"
@@ -56,6 +57,54 @@ func (store *fakeStore) Add(rawURL string) (endpoint.Endpoint, probe.Result, err
 	}, nil
 }
 
+func (store *fakeStore) Refresh(id uuid.UUID) (probe.Result, error) {
+	for i := range store.endpoints {
+		if store.endpoints[i].ID == id {
+			result := probe.Result{
+				StatusCode: http.StatusOK,
+				Available:  true,
+			}
+
+			store.endpoints[i].LastResult = result
+
+			return result, nil
+		}
+	}
+
+	return probe.Result{}, endpoint.ErrEndpointNotFound
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := securityHeaders(next)
+
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("securityHeaders status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+
+	if got := recorder.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %q, want %q", got, "nosniff")
+	}
+
+	if got := recorder.Header().Get("Referrer-Policy"); got != "no-referrer" {
+		t.Errorf("Referrer-Policy = %q, want %q", got, "no-referrer")
+	}
+
+	wantCSP := "default-src 'self'; frame-ancestors 'none'"
+
+	if got := recorder.Header().Get("Content-Security-Policy"); got != wantCSP {
+		t.Errorf("Content-Security-Policy = %q, want %q", got, wantCSP)
+	}
+}
+
 func TestGetIndex(t *testing.T) {
 	wantURL := "https://example.com/"
 
@@ -75,7 +124,6 @@ func TestGetIndex(t *testing.T) {
 
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	recorder := httptest.NewRecorder()
-
 	handler.ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusOK {
@@ -99,20 +147,11 @@ func TestPostEndpoint(t *testing.T) {
 		}
 
 		wantURL := "https://example.com/"
-		csrfToken := "test-csrf-token"
 
 		form := url.Values{}
 		form.Set("url", wantURL)
-		form.Set("csrf_token", csrfToken)
 
-		request := httptest.NewRequest(http.MethodPost, "/endpoints", strings.NewReader(form.Encode()))
-		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		request.AddCookie(&http.Cookie{
-			Name:  "csrf_token",
-			Value: csrfToken,
-		})
-
+		request := newCSRFPostRequest(t, "/endpoints", form)
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, request)
 
@@ -193,6 +232,11 @@ func TestGetEndpoint(t *testing.T) {
 			{
 				ID:  id,
 				URL: wantURL,
+				LastResult: probe.Result{
+					StatusCode: http.StatusOK,
+					Latency:    50 * time.Millisecond,
+					Available:  true,
+				},
 			},
 		},
 	}
@@ -213,8 +257,18 @@ func TestGetEndpoint(t *testing.T) {
 			t.Errorf("GET /endpoints/{id} status = %d, want %d", recorder.Code, http.StatusOK)
 		}
 
-		if !strings.Contains(recorder.Body.String(), wantURL) {
-			t.Errorf("GET /endpoints/{id} body = %q, want endpoint URL %q", recorder.Body.String(), wantURL)
+		body := recorder.Body.String()
+
+		if !strings.Contains(body, wantURL) {
+			t.Errorf("GET /endpoints/{id} body = %q, want endpoint URL %q", body, wantURL)
+		}
+
+		if !strings.Contains(body, "200") {
+			t.Errorf("GET /endpoints/{id} body = %q, want status code 200", body)
+		}
+
+		if !strings.Contains(body, "true") {
+			t.Errorf("GET /endpoints/{id} body = %q, want available true", body)
 		}
 	})
 
@@ -267,19 +321,7 @@ func TestPostDeleteEndpoint(t *testing.T) {
 			t.Fatalf("NewHandler() unexpected error = %v", err)
 		}
 
-		csrfToken := "test-csrf-token"
-
-		form := url.Values{}
-		form.Set("csrf_token", csrfToken)
-
-		request := httptest.NewRequest(http.MethodPost, "/endpoints/"+id.String()+"/delete", strings.NewReader(form.Encode()))
-		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		request.AddCookie(&http.Cookie{
-			Name:  "csrf_token",
-			Value: csrfToken,
-		})
-
+		request := newCSRFPostRequest(t, "/endpoints/"+id.String()+"/delete", nil)
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, request)
 
@@ -308,19 +350,7 @@ func TestPostDeleteEndpoint(t *testing.T) {
 			t.Fatalf("NewHandler() unexpected error = %v", err)
 		}
 
-		csrfToken := "test-csrf-token"
-
-		form := url.Values{}
-		form.Set("csrf_token", csrfToken)
-
-		request := httptest.NewRequest(http.MethodPost, "/endpoints/not-a-uuid/delete", strings.NewReader(form.Encode()))
-		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		request.AddCookie(&http.Cookie{
-			Name:  "csrf_token",
-			Value: csrfToken,
-		})
-
+		request := newCSRFPostRequest(t, "/endpoints/not-a-uuid/delete", nil)
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, request)
 
@@ -330,6 +360,7 @@ func TestPostDeleteEndpoint(t *testing.T) {
 	})
 
 	t.Run("endpoint not found", func(t *testing.T) {
+		missingID := uuid.NewV7()
 		store := &fakeStore{}
 
 		handler, err := NewHandler(store, logger)
@@ -337,20 +368,7 @@ func TestPostDeleteEndpoint(t *testing.T) {
 			t.Fatalf("NewHandler() unexpected error = %v", err)
 		}
 
-		csrfToken := "test-csrf-token"
-		missingID := uuid.NewV7()
-
-		form := url.Values{}
-		form.Set("csrf_token", csrfToken)
-
-		request := httptest.NewRequest(http.MethodPost, "/endpoints/"+missingID.String()+"/delete", strings.NewReader(form.Encode()))
-		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		request.AddCookie(&http.Cookie{
-			Name:  "csrf_token",
-			Value: csrfToken,
-		})
-
+		request := newCSRFPostRequest(t, "/endpoints/"+missingID.String()+"/delete", nil)
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, request)
 
@@ -377,7 +395,6 @@ func TestPostDeleteEndpoint(t *testing.T) {
 		}
 
 		request := httptest.NewRequest(http.MethodPost, "/endpoints/"+id.String()+"/delete", nil)
-
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, request)
 
@@ -423,33 +440,71 @@ func TestPostDeleteEndpoint(t *testing.T) {
 	})
 }
 
-func TestSecurityHeaders(t *testing.T) {
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+func TestRefreshEndpoint(t *testing.T) {
+	id := uuid.NewV7()
 
-	handler := securityHeaders(next)
+	store := &fakeStore{
+		endpoints: []endpoint.Endpoint{
+			{
+				ID:  id,
+				URL: "https://example.com/",
+				LastResult: probe.Result{
+					StatusCode: http.StatusServiceUnavailable,
+					Available:  true,
+				},
+			},
+		},
+	}
 
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	handler, err := NewHandler(store, logger)
+	if err != nil {
+		t.Fatalf("NewHandler() unexpected error = %v", err)
+	}
+
+	request := newCSRFPostRequest(t, "/endpoints/"+id.String()+"/refresh", nil)
 	recorder := httptest.NewRecorder()
 
 	handler.ServeHTTP(recorder, request)
 
-	if recorder.Code != http.StatusOK {
-		t.Errorf("securityHeaders status = %d, want %d", recorder.Code, http.StatusOK)
+	if recorder.Code != http.StatusSeeOther {
+		t.Errorf("POST /endpoints/{id}/refresh status = %d, want %d", recorder.Code, http.StatusSeeOther)
 	}
 
-	if got := recorder.Header().Get("X-Content-Type-Options"); got != "nosniff" {
-		t.Errorf("X-Content-Type-Options = %q, want %q", got, "nosniff")
+	wantLocation := "/endpoints/" + id.String()
+
+	if location := recorder.Header().Get("Location"); location != wantLocation {
+		t.Errorf("POST /endpoints/{id}/refresh Location = %q, want %q", location, wantLocation)
 	}
 
-	if got := recorder.Header().Get("Referrer-Policy"); got != "no-referrer" {
-		t.Errorf("Referrer-Policy = %q, want %q", got, "no-referrer")
+	if store.endpoints[0].LastResult.StatusCode != http.StatusOK {
+		t.Errorf("POST /endpoints/{id}/refresh StatusCode = %d, want %d", store.endpoints[0].LastResult.StatusCode, http.StatusOK)
 	}
 
-	wantCSP := "default-src 'self'; frame-ancestors 'none'"
-
-	if got := recorder.Header().Get("Content-Security-Policy"); got != wantCSP {
-		t.Errorf("Content-Security-Policy = %q, want %q", got, wantCSP)
+	if !store.endpoints[0].LastResult.Available {
+		t.Error("POST /endpoints/{id}/refresh Available = false, want true")
 	}
+}
+
+func newCSRFPostRequest(t *testing.T, path string, values url.Values) *http.Request {
+	t.Helper()
+
+	csrfToken := "test-csrf-token"
+
+	if values == nil {
+		values = url.Values{}
+	}
+
+	values.Set("csrf_token", csrfToken)
+
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(values.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	request.AddCookie(&http.Cookie{
+		Name:  "csrf_token",
+		Value: csrfToken,
+	})
+
+	return request
 }

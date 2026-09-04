@@ -153,6 +153,10 @@ func TestAddValidEndpoint(t *testing.T) {
 		t.Errorf("Add() result.Latency = %v, want %v", result.Latency, 50*time.Millisecond)
 	}
 
+	if store.endpoints[0].LastResult != result {
+		t.Errorf("Add() stored LastResult = %+v, want %+v", store.endpoints[0].LastResult, result)
+	}
+
 	if len(store.endpoints) != 1 {
 		t.Errorf("Add() store size = %d, want 1", len(store.endpoints))
 	}
@@ -421,4 +425,115 @@ func TestRemoveByID(t *testing.T) {
 			t.Errorf("RemoveByID() store size = %d, want 1", len(store.endpoints))
 		}
 	})
+}
+
+func TestRefreshEndpoint(t *testing.T) {
+	id := uuid.NewV7()
+
+	store := NewStore()
+
+	store.endpoints = []Endpoint{
+		{
+			ID:  id,
+			URL: "https://example.com/",
+			LastResult: probe.Result{
+				StatusCode: http.StatusOK,
+				Latency:    20 * time.Millisecond,
+				Available:  true,
+			},
+		},
+	}
+
+	store.validateHost = func(string) ([]netip.Addr, error) {
+		return []netip.Addr{
+			netip.MustParseAddr("93.184.216.34"),
+		}, nil
+	}
+
+	wantResult := probe.Result{
+		StatusCode: http.StatusServiceUnavailable,
+		Latency:    80 * time.Millisecond,
+		Available:  true,
+	}
+
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		return wantResult, nil
+	}
+
+	result, err := store.Refresh(id)
+	if err != nil {
+		t.Fatalf("Refresh() unexpected error = %v", err)
+	}
+
+	if result != wantResult {
+		t.Errorf("Refresh() result = %+v, want %+v", result, wantResult)
+	}
+
+	if store.endpoints[0].LastResult != wantResult {
+		t.Errorf("Refresh() stored LastResult = %+v, want %+v", store.endpoints[0].LastResult, wantResult)
+	}
+}
+
+func TestRefreshEndpointNotFound(t *testing.T) {
+	store := NewStore()
+
+	result, err := store.Refresh(uuid.NewV7())
+
+	if !errors.Is(err, ErrEndpointNotFound) {
+		t.Fatalf("Refresh() error = %v, want %v", err, ErrEndpointNotFound)
+	}
+
+	if result != (probe.Result{}) {
+		t.Errorf("Refresh() result = %+v, want empty Result", result)
+	}
+}
+
+func TestRefreshUnreachableEndpoint(t *testing.T) {
+	id := uuid.NewV7()
+
+	store := NewStore()
+
+	store.endpoints = []Endpoint{
+		{
+			ID:  id,
+			URL: "https://example.com/",
+			LastResult: probe.Result{
+				StatusCode: http.StatusOK,
+				Latency:    20 * time.Millisecond,
+				Available:  true,
+			},
+		},
+	}
+
+	store.validateHost = func(string) ([]netip.Addr, error) {
+		return []netip.Addr{
+			netip.MustParseAddr("93.184.216.34"),
+		}, nil
+	}
+
+	unreachableErr := errors.New("endpoint unreachable")
+
+	wantResult := probe.Result{
+		StatusCode: 0,
+		Latency:    80 * time.Millisecond,
+		Available:  false,
+	}
+
+	store.probeHTTP = func(*url.URL, []netip.Addr) (probe.Result, error) {
+		return wantResult, unreachableErr
+	}
+
+	result, err := store.Refresh(id)
+
+	if !errors.Is(err, unreachableErr) {
+		t.Fatalf("Refresh() error = %v, want %v", err, unreachableErr)
+	}
+
+	if result != wantResult {
+		t.Errorf("Refresh() result = %+v, want %+v", result, wantResult)
+	}
+
+	if store.endpoints[0].LastResult != wantResult {
+		t.Errorf("Refresh() stored LastResult = %+v, want %+v", store.endpoints[0].LastResult, wantResult)
+	}
 }

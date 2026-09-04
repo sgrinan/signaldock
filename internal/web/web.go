@@ -24,11 +24,18 @@ type PageData struct {
 	CSRFToken string
 }
 
+type EndpointPageData struct {
+	Endpoint  endpoint.Endpoint
+	CSRFToken string
+	LatencyMS int64
+}
+
 type EndpointStore interface {
 	Add(string) (endpoint.Endpoint, probe.Result, error)
 	List() []endpoint.Endpoint
 	GetByID(uuid.UUID) (endpoint.Endpoint, bool)
 	RemoveByID(uuid.UUID) bool
+	Refresh(uuid.UUID) (probe.Result, error)
 }
 
 func generateCSRFToken() string {
@@ -70,7 +77,8 @@ func NewHandler(store EndpointStore, logger *slog.Logger) (http.Handler, error) 
 	mux.HandleFunc("GET /{$}", handleGetIndex(store, tmpl, logger))
 	mux.HandleFunc("POST /endpoints", handlePostEndpoint(store, logger))
 	mux.HandleFunc("GET /endpoints/{id}", handleGetEndpoint(store, tmpl, logger))
-	mux.HandleFunc("POST /endpoints/{id}/delete", handleDeleteEndpoint(store))
+	mux.HandleFunc("POST /endpoints/{id}/delete", handleDeleteEndpoint(store, logger))
+	mux.HandleFunc("POST /endpoints/{id}/refresh", handleRefreshEndpoint(store, logger))
 
 	return securityHeaders(mux), nil
 }
@@ -124,6 +132,7 @@ func handlePostEndpoint(store EndpointStore, logger *slog.Logger) http.HandlerFu
 		added, _, err := store.Add(rawURL)
 		switch {
 		case err == nil:
+			logger.Info("endpoint added", "url", added.URL, "id", added.ID)
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 
@@ -163,13 +172,28 @@ func handleGetEndpoint(store EndpointStore, tmpl *template.Template, logger *slo
 			return
 		}
 
-		endpoint, found := store.GetByID(id)
+		ep, found := store.GetByID(id)
 		if !found {
 			http.Error(w, "endpoint not found", http.StatusNotFound)
 			return
 		}
 
-		if err := tmpl.ExecuteTemplate(w, "endpoint.html", endpoint); err != nil {
+		csrfToken := generateCSRFToken()
+
+		pageData := EndpointPageData{
+			Endpoint:  ep,
+			CSRFToken: csrfToken,
+			LatencyMS: ep.LastResult.Latency.Milliseconds(),
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "csrf_token",
+			Value:    csrfToken,
+			Path:     "/",
+			SameSite: http.SameSiteStrictMode,
+		})
+
+		if err := tmpl.ExecuteTemplate(w, "endpoint.html", pageData); err != nil {
 			logger.Error("failed to render template", "template", "endpoint.html", "error", err)
 			http.Error(w, "failed to render page", http.StatusInternalServerError)
 			return
@@ -177,7 +201,7 @@ func handleGetEndpoint(store EndpointStore, tmpl *template.Template, logger *slo
 	}
 }
 
-func handleDeleteEndpoint(store EndpointStore) http.HandlerFunc {
+func handleDeleteEndpoint(store EndpointStore, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !validateCSRF(r) {
 			http.Error(w, "forbidden", http.StatusForbidden)
@@ -198,6 +222,47 @@ func handleDeleteEndpoint(store EndpointStore) http.HandlerFunc {
 			return
 		}
 
+		logger.Info("endpoint removed", "id", id)
+
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+}
+
+func handleRefreshEndpoint(store EndpointStore, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !validateCSRF(r) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		rawID := r.PathValue("id")
+
+		id, err := uuid.Parse(rawID)
+		if err != nil {
+			http.Error(w, "invalid endpoint ID", http.StatusBadRequest)
+			return
+		}
+
+		result, err := store.Refresh(id)
+
+		switch {
+		case err == nil:
+			logger.Info(
+				"endpoint refreshed",
+				"id", id,
+				"status_code", result.StatusCode,
+				"available", result.Available,
+				"latency", result.Latency,
+			)
+
+		case errors.Is(err, endpoint.ErrEndpointNotFound):
+			http.Error(w, "endpoint not found", http.StatusNotFound)
+			return
+
+		default:
+			logger.Warn("endpoint refresh failed", "id", id, "error", err)
+		}
+
+		http.Redirect(w, r, "/endpoints/"+id.String(), http.StatusSeeOther)
 	}
 }

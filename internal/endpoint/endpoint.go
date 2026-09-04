@@ -17,11 +17,13 @@ var (
 	ErrUnsupportedScheme = errors.New("unsupported URL scheme")
 	ErrHostRequired      = errors.New("URL host is required")
 	ErrEndpointExists    = errors.New("endpoint already exists")
+	ErrEndpointNotFound  = errors.New("endpoint not found")
 )
 
 type Endpoint struct {
-	ID  uuid.UUID
-	URL string
+	ID         uuid.UUID
+	URL        string
+	LastResult probe.Result
 }
 
 type Store struct {
@@ -88,14 +90,14 @@ func (store *Store) Add(rawURL string) (Endpoint, probe.Result, error) {
 		return Endpoint{}, probe.Result{}, ErrEndpointExists
 	}
 
-	id := uuid.NewV7()
+	result, err := store.probeHTTP(parsedURL, ips)
 
 	endpoint := Endpoint{
-		ID:  id,
-		URL: parsedURL.String(),
+		ID:         uuid.NewV7(),
+		URL:        parsedURL.String(),
+		LastResult: result,
 	}
 
-	result, err := store.probeHTTP(parsedURL, ips)
 	if err != nil {
 		store.endpoints = append(store.endpoints, endpoint)
 		return endpoint, result, err
@@ -136,4 +138,36 @@ func (store *Store) RemoveByID(id uuid.UUID) bool {
 		}
 	}
 	return false
+}
+
+func (store *Store) Refresh(id uuid.UUID) (probe.Result, error) {
+	endpoint, found := store.GetByID(id)
+	if !found {
+		return probe.Result{}, ErrEndpointNotFound
+	}
+
+	parsedURL, err := ParseURL(endpoint.URL)
+	if err != nil {
+		return probe.Result{}, err
+	}
+
+	ips, err := store.validateHost(parsedURL.Hostname())
+	if err != nil {
+		return probe.Result{}, err
+	}
+
+	result, err := store.probeHTTP(parsedURL, ips)
+
+	for i := range store.endpoints {
+		if store.endpoints[i].ID == id {
+			store.endpoints[i].LastResult = result
+			break
+		}
+	}
+
+	if err != nil {
+		return result, err
+	}
+
+	return result, nil
 }

@@ -1,3 +1,14 @@
 <h1>Endpoint</h1>
 
-<p>{{ .URL }}</p>
+<p>{{ .Endpoint.URL }}</p>
+
+<p>Status code: {{ .Endpoint.LastResult.StatusCode }}</p>
+<p>Available: {{ .Endpoint.LastResult.Available }}</p>
+<p>Latency: {{ .LatencyMS }} ms</p>
+
+<form method="POST" action="/endpoints/{{ .Endpoint.ID }}/refresh">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+    <button type="submit">Check now</button>
+</form>
+
+<a href="/">Back to endpoints</a>
