@@ -106,12 +106,21 @@ func handleGetIndex(store EndpointStore, tmpl *template.Template, logger *slog.L
 		switch result {
 		case "unreachable":
 			pageData.Error = "Endpoint was added, but it is currently unreachable"
+
 		case "duplicate":
 			pageData.Error = "Endpoint already exists"
+
 		case "invalid":
 			pageData.Error = "Enter a valid HTTP or HTTPS URL"
+
 		case "unsafe":
 			pageData.Error = "Private or unsafe network destinations are not allowed"
+
+		case "tls-invalid":
+			pageData.Error = "Endpoint was added, but its TLS certificate is invalid"
+
+		case "check-failed":
+			pageData.Error = "Endpoint was added, but its HTTP and TLS checks failed"
 		}
 
 		if err := tmpl.ExecuteTemplate(w, "index.html", pageData); err != nil {
@@ -132,6 +141,9 @@ func handlePostEndpoint(store EndpointStore, logger *slog.Logger) http.HandlerFu
 		rawURL := r.FormValue("url")
 
 		added, err := store.Add(rawURL)
+
+		var checkErr endpoint.CheckError
+
 		switch {
 		case err == nil:
 			logger.Info("endpoint added", "url", added.URL, "id", added.ID)
@@ -151,10 +163,23 @@ func handlePostEndpoint(store EndpointStore, logger *slog.Logger) http.HandlerFu
 			http.Redirect(w, r, "/?result=unsafe", http.StatusSeeOther)
 			return
 
-		case added != (endpoint.Endpoint{}):
-			logger.Warn("endpoint initial check failed", "url", added.URL, "error", err)
-			http.Redirect(w, r, "/?result=unreachable", http.StatusSeeOther)
-			return
+		case errors.As(err, &checkErr):
+			switch {
+			case checkErr.HTTP != nil && checkErr.TLS != nil:
+				logger.Warn("endpoint HTTP and TLS checks failed", "url", added.URL, "http_error", checkErr.HTTP, "tls_error", checkErr.TLS)
+				http.Redirect(w, r, "/?result=check-failed", http.StatusSeeOther)
+				return
+
+			case checkErr.HTTP != nil:
+				logger.Warn("endpoint HTTP check failed", "url", added.URL, "error", checkErr.HTTP)
+				http.Redirect(w, r, "/?result=unreachable", http.StatusSeeOther)
+				return
+
+			case checkErr.TLS != nil:
+				logger.Warn("endpoint TLS check failed", "url", added.URL, "error", checkErr.TLS)
+				http.Redirect(w, r, "/?result=tls-invalid", http.StatusSeeOther)
+				return
+			}
 
 		default:
 			logger.Error("failed to add endpoint", "url", rawURL, "error", err)
@@ -253,24 +278,36 @@ func handleRefreshEndpoint(store EndpointStore, logger *slog.Logger) http.Handle
 			return
 		}
 
-		result, err := store.Refresh(id)
+		check, err := store.Refresh(id)
+
+		var checkErr endpoint.CheckError
 
 		switch {
 		case err == nil:
 			logger.Info(
 				"endpoint refreshed",
 				"id", id,
-				"status_code", result.HTTP.StatusCode,
-				"available", result.HTTP.Available,
-				"latency", result.HTTP.Latency,
+				"status_code", check.HTTP.StatusCode,
+				"available", check.HTTP.Available,
+				"latency", check.HTTP.Latency,
+				"tls_enabled", check.TLS.Enabled,
+				"tls_valid", check.TLS.Valid,
 			)
 
 		case errors.Is(err, endpoint.ErrEndpointNotFound):
 			http.Error(w, "endpoint not found", http.StatusNotFound)
 			return
 
+		case errors.As(err, &checkErr):
+			logger.Warn(
+				"endpoint refresh completed with check errors",
+				"id", id,
+				"http_error", checkErr.HTTP,
+				"tls_error", checkErr.TLS,
+			)
+
 		default:
-			logger.Warn("endpoint refresh failed", "id", id, "error", err)
+			logger.Error("endpoint refresh failed", "id", id, "error", err)
 		}
 
 		http.Redirect(w, r, "/endpoints/"+id.String(), http.StatusSeeOther)

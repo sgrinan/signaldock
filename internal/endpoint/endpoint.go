@@ -40,6 +40,11 @@ type Store struct {
 	probeTLS     func(*url.URL, []netip.Addr) (probe.TLSResult, error)
 }
 
+type CheckError struct {
+	HTTP error
+	TLS  error
+}
+
 func ParseURL(rawURL string) (*url.URL, error) {
 	rawURL = strings.TrimSpace(rawURL)
 
@@ -133,7 +138,10 @@ func (store *Store) Add(rawURL string) (Endpoint, error) {
 	store.mu.Unlock()
 
 	if httpErr != nil || tlsErr != nil {
-		return endpoint, errors.Join(httpErr, tlsErr)
+		return endpoint, CheckError{
+			HTTP: httpErr,
+			TLS:  tlsErr,
+		}
 	}
 
 	return endpoint, nil
@@ -225,8 +233,38 @@ func (store *Store) Refresh(id uuid.UUID) (CheckResult, error) {
 	store.mu.Unlock()
 
 	if httpErr != nil || tlsErr != nil {
-		return lastCheck, errors.Join(httpErr, tlsErr)
+		return lastCheck, CheckError{
+			HTTP: httpErr,
+			TLS:  tlsErr,
+		}
 	}
 
 	return lastCheck, nil
+}
+
+func (err CheckError) Error() string {
+	switch {
+	case err.HTTP != nil && err.TLS != nil:
+		return "HTTP and TLS checks failed"
+	case err.HTTP != nil:
+		return "HTTP check failed"
+	case err.TLS != nil:
+		return "TLS check failed"
+	default:
+		return ""
+	}
+}
+
+func (err CheckError) Unwrap() []error {
+	var errs []error
+
+	if err.HTTP != nil {
+		errs = append(errs, err.HTTP)
+	}
+
+	if err.TLS != nil {
+		errs = append(errs, err.TLS)
+	}
+
+	return errs
 }
