@@ -1,24 +1,13 @@
 package endpoint
 
 import (
-	"errors"
-	"fmt"
-	"net"
 	"net/netip"
 	"net/url"
 	"slices"
-	"strings"
 	"sync"
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/probe"
-)
-
-var (
-	ErrUnsupportedScheme = errors.New("unsupported URL scheme")
-	ErrHostRequired      = errors.New("URL host is required")
-	ErrEndpointExists    = errors.New("endpoint already exists")
-	ErrEndpointNotFound  = errors.New("endpoint not found")
 )
 
 type Endpoint struct {
@@ -38,47 +27,6 @@ type Store struct {
 	validateHost func(string) ([]netip.Addr, error)
 	probeHTTP    func(*url.URL, []netip.Addr) (probe.Result, error)
 	probeTLS     func(*url.URL, []netip.Addr) (probe.TLSResult, error)
-}
-
-type CheckError struct {
-	HTTP error
-	TLS  error
-}
-
-func ParseURL(rawURL string) (*url.URL, error) {
-	rawURL = strings.TrimSpace(rawURL)
-
-	parsedURL, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, fmt.Errorf("ParseURL: %w", err)
-	}
-
-	parsedURL.Scheme = strings.ToLower(parsedURL.Scheme)
-
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return nil, ErrUnsupportedScheme
-	}
-
-	if parsedURL.Hostname() == "" {
-		return nil, ErrHostRequired
-	}
-
-	hostname := strings.ToLower(parsedURL.Hostname())
-	port := parsedURL.Port()
-
-	if port != "" {
-		parsedURL.Host = net.JoinHostPort(hostname, port)
-	} else if strings.Contains(hostname, ":") {
-		parsedURL.Host = "[" + hostname + "]"
-	} else {
-		parsedURL.Host = hostname
-	}
-
-	if parsedURL.Path == "" {
-		parsedURL.Path = "/"
-	}
-
-	return parsedURL, nil
 }
 
 func NewStore() *Store {
@@ -240,31 +188,4 @@ func (store *Store) Refresh(id uuid.UUID) (CheckResult, error) {
 	}
 
 	return lastCheck, nil
-}
-
-func (err CheckError) Error() string {
-	switch {
-	case err.HTTP != nil && err.TLS != nil:
-		return "HTTP and TLS checks failed"
-	case err.HTTP != nil:
-		return "HTTP check failed"
-	case err.TLS != nil:
-		return "TLS check failed"
-	default:
-		return ""
-	}
-}
-
-func (err CheckError) Unwrap() []error {
-	var errs []error
-
-	if err.HTTP != nil {
-		errs = append(errs, err.HTTP)
-	}
-
-	if err.TLS != nil {
-		errs = append(errs, err.TLS)
-	}
-
-	return errs
 }
