@@ -64,13 +64,7 @@ func (store *Store) Add(rawURL string) (Endpoint, error) {
 
 	store.mu.Unlock()
 
-	httpResult, httpErr := store.probeHTTP(parsedURL, ips)
-	tlsResult, tlsErr := store.probeTLS(parsedURL, ips)
-
-	lastCheck := CheckResult{
-		HTTP: httpResult,
-		TLS:  tlsResult,
-	}
+	lastCheck, checkErr := store.check(parsedURL, ips)
 
 	endpoint.LastCheck = lastCheck
 
@@ -85,14 +79,7 @@ func (store *Store) Add(rawURL string) (Endpoint, error) {
 
 	store.mu.Unlock()
 
-	if httpErr != nil || tlsErr != nil {
-		return endpoint, CheckError{
-			HTTP: httpErr,
-			TLS:  tlsErr,
-		}
-	}
-
-	return endpoint, nil
+	return endpoint, checkErr
 }
 
 func (store *Store) List() []Endpoint {
@@ -163,29 +150,37 @@ func (store *Store) Refresh(id uuid.UUID) (CheckResult, error) {
 		return CheckResult{}, err
 	}
 
-	httpResult, httpErr := store.probeHTTP(parsedURL, ips)
-	tlsResult, tlsErr := store.probeTLS(parsedURL, ips)
-
-	lastCheck := CheckResult{
-		HTTP: httpResult,
-		TLS:  tlsResult,
-	}
+	lastCheck, checkErr := store.check(parsedURL, ips)
 
 	store.mu.Lock()
+
 	for i := range store.endpoints {
 		if store.endpoints[i].ID == id {
 			store.endpoints[i].LastCheck = lastCheck
 			break
 		}
 	}
+
 	store.mu.Unlock()
 
+	return lastCheck, checkErr
+}
+
+func (store *Store) check(parsedURL *url.URL, ips []netip.Addr) (CheckResult, error) {
+	httpResult, httpErr := store.probeHTTP(parsedURL, ips)
+	tlsResult, tlsErr := store.probeTLS(parsedURL, ips)
+
+	result := CheckResult{
+		HTTP: httpResult,
+		TLS:  tlsResult,
+	}
+
 	if httpErr != nil || tlsErr != nil {
-		return lastCheck, CheckError{
+		return result, CheckError{
 			HTTP: httpErr,
 			TLS:  tlsErr,
 		}
 	}
 
-	return lastCheck, nil
+	return result, nil
 }
