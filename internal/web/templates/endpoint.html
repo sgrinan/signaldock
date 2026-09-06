@@ -2,28 +2,40 @@
 
 <p>{{ .Endpoint.URL }}</p>
 
-<p>Status code: {{ .Endpoint.LastCheck.HTTP.StatusCode }}</p>
-<p>Available: {{ .Endpoint.LastCheck.HTTP.Available }}</p>
+<h2>HTTP</h2>
+
+{{ if .Endpoint.LastCheck.HTTP.Responded }}
+    <p>Status code: {{ .Endpoint.LastCheck.HTTP.StatusCode }}</p>
+    <p>Responded: true</p>
+{{ else }}
+    <p>Responded: false</p>
+{{ end }}
+
 <p>Latency: {{ .LatencyMS }} ms</p>
-<p>Last checked: {{ .LastCheckedAt }}</p>
+
+{{ if .LastCheckedAt }}
+    <p>Last checked: {{ .LastCheckedAt }}</p>
+{{ end }}
 
 <form method="POST" action="/endpoints/{{ .Endpoint.ID }}/refresh">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
     <button type="submit">Check now</button>
 </form>
 
-<a href="/">Back to endpoints</a>
+<p><a href="/">Back to endpoints</a></p>
 
 <h2>TLS</h2>
 
 {{ if .Endpoint.LastCheck.TLS.Enabled }}
 
     <p>Enabled: true</p>
-    <p>Valid: {{ .Endpoint.LastCheck.TLS.Valid }}</p>
 
-    {{ if .Endpoint.LastCheck.TLS.Valid }}
+    {{ if .TLSExpiresAt }}
+        <p>Valid: {{ .Endpoint.LastCheck.TLS.Valid }}</p>
         <p>Expires: {{ .TLSExpiresAt }}</p>
         <p>Days remaining: {{ .Endpoint.LastCheck.TLS.DaysRemaining }}</p>
+    {{ else }}
+        <p>Certificate information unavailable</p>
     {{ end }}
 
 {{ else }}

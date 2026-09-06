@@ -2,16 +2,21 @@
 
 <form method="POST" action="/endpoints">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-
-    <input type="url" id="url" name="url" required>
+    <label for="url">Endpoint URL</label>
+    <input type="url" id="url" name="url" placeholder="https://example.com" required>
     <button type="submit">Add</button>
 </form>
+
+{{ if .Error }}
+    <p>{{ .Error }}</p>
+{{ end }}
 
 <h2>Endpoints</h2>
 
 {{ range .Endpoints }}
     <div>
         <span>{{ .URL }}</span>
+
         <a href="/endpoints/{{ .ID }}">View</a>
 
         <form method="POST" action="/endpoints/{{ .ID }}/delete">
@@ -19,8 +24,4 @@
             <button type="submit">Remove</button>
         </form>
     </div>
-{{ end }}
-
-{{ if .Error }}
-    <p>{{ .Error }}</p>
 {{ end }}
