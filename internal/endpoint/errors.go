@@ -3,12 +3,18 @@ package endpoint
 import "errors"
 
 var (
-	ErrUnsupportedScheme = errors.New("unsupported URL scheme")
-	ErrHostRequired      = errors.New("URL host is required")
-	ErrEndpointExists    = errors.New("endpoint already exists")
-	ErrEndpointNotFound  = errors.New("endpoint not found")
+	ErrUnsupportedScheme     = errors.New("unsupported URL scheme")
+	ErrHostRequired          = errors.New("URL host is required")
+	ErrCredentialsNotAllowed = errors.New("credentials in URL are not allowed")
+	ErrInvalidPort           = errors.New("invalid URL port")
+	ErrInvalidURL            = errors.New("invalid URL")
+	ErrUnsafeHost            = errors.New("unsafe endpoint host")
+
+	ErrEndpointExists   = errors.New("endpoint already exists")
+	ErrEndpointNotFound = errors.New("endpoint not found")
 )
 
+// CheckError contains failures produced by the HTTP and TLS checks.
 type CheckError struct {
 	HTTP error
 	TLS  error
