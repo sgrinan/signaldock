@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const tlsProbeTimeout = 5 * time.Second
+
 // TLS probes the TLS configuration and certificate of an HTTPS endpoint.
 func TLS(parsedURL *url.URL, ips []netip.Addr) (TLSResult, error) {
 	return tlsProbe(parsedURL, ips, nil)
@@ -32,7 +34,9 @@ func tlsProbe(parsedURL *url.URL, ips []netip.Addr, rootCAs *x509.CertPool) (TLS
 	config := newTLSConfig(parsedURL.Hostname())
 
 	dialer := &net.Dialer{
-		Timeout: connectTimeout,
+		// Use one absolute deadline for the entire probe so trying multiple
+		// validated IPs cannot multiply the TLS timeout.
+		Deadline: time.Now().Add(tlsProbeTimeout),
 	}
 
 	var lastErr error

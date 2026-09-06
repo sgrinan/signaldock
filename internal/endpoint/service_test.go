@@ -2,9 +2,13 @@ package endpoint
 
 import (
 	"errors"
+	"net/http"
 	"net/netip"
 	"net/url"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"uuid"
 
@@ -171,6 +175,88 @@ func TestService_Add(t *testing.T) {
 
 		if stored != first {
 			t.Errorf("ByID(%v) = %+v, want %+v", first.ID, stored, first)
+		}
+	})
+
+	t.Run("concurrent_duplicate_runs_probes_once", func(t *testing.T) {
+		s, store := newTestService()
+
+		const goroutines = 10
+
+		var httpCalls atomic.Int32
+		var tlsCalls atomic.Int32
+
+		s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
+			httpCalls.Add(1)
+
+			time.Sleep(50 * time.Millisecond)
+
+			return probe.HTTPResult{
+				StatusCode: http.StatusOK,
+				Responded:  true,
+			}, nil
+		}
+
+		s.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+			tlsCalls.Add(1)
+
+			return probe.TLSResult{
+				Enabled: true,
+				Valid:   true,
+			}, nil
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(goroutines)
+
+		errs := make(chan error, goroutines)
+
+		for range goroutines {
+			go func() {
+				defer wg.Done()
+
+				_, err := s.Add("https://example.com")
+				errs <- err
+			}()
+		}
+
+		wg.Wait()
+		close(errs)
+
+		var successCount int
+		var duplicateCount int
+
+		for err := range errs {
+			switch {
+			case err == nil:
+				successCount++
+
+			case errors.Is(err, ErrEndpointExists):
+				duplicateCount++
+
+			default:
+				t.Errorf("Add() returned unexpected error: %v", err)
+			}
+		}
+
+		if successCount != 1 {
+			t.Errorf("successful Add() calls = %d, want 1", successCount)
+		}
+
+		if duplicateCount != goroutines-1 {
+			t.Errorf("duplicate Add() calls = %d, want %d", duplicateCount, goroutines-1)
+		}
+
+		if got := len(store.List()); got != 1 {
+			t.Errorf("len(List()) = %d, want 1", got)
+		}
+
+		if got := httpCalls.Load(); got != 1 {
+			t.Errorf("HTTP probe calls = %d, want 1", got)
+		}
+
+		if got := tlsCalls.Load(); got != 1 {
+			t.Errorf("TLS probe calls = %d, want 1", got)
 		}
 	})
 }

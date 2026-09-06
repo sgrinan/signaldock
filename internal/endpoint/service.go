@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"time"
 
 	"uuid"
 
@@ -29,37 +30,10 @@ func NewService(store *Store) *Service {
 	}
 }
 
-// check runs the HTTP and TLS probes independently so both results and
-// failures are preserved.
-func (s *Service) check(parsedURL *url.URL, ips []netip.Addr) (CheckResult, error) {
-	httpResult, httpErr := s.probeHTTP(parsedURL, ips)
-	tlsResult, tlsErr := s.probeTLS(parsedURL, ips)
-
-	result := CheckResult{
-		HTTP: httpResult,
-		TLS:  tlsResult,
-	}
-
-	if httpErr != nil || tlsErr != nil {
-		return result, CheckError{
-			HTTP: httpErr,
-			TLS:  tlsErr,
-		}
-	}
-
-	return result, nil
-}
-
 // Add validates and checks rawURL, then stores the resulting endpoint.
-// Probe failures do not prevent the endpoint or its observed results from
-// being stored.
+// Probe failures do not prevent the endpoint or its observed results from being stored.
 func (s *Service) Add(rawURL string) (Endpoint, error) {
 	parsedURL, err := ParseURL(rawURL)
-	if err != nil {
-		return Endpoint{}, err
-	}
-
-	ips, err := s.validateEndpointHost(parsedURL)
 	if err != nil {
 		return Endpoint{}, err
 	}
@@ -69,12 +43,35 @@ func (s *Service) Add(rawURL string) (Endpoint, error) {
 		URL: parsedURL.String(),
 	}
 
-	lastCheck, checkErr := s.check(parsedURL, ips)
+	ips, err := s.validateEndpointHost(parsedURL)
+	if err != nil {
+		if errors.Is(err, ErrUnsafeHost) {
+			return Endpoint{}, err
+		}
 
-	ep.LastCheck = lastCheck
+		ep.LastCheck = hostFailureResult(parsedURL)
 
+		if insertErr := s.store.Insert(ep); insertErr != nil {
+			return Endpoint{}, insertErr
+		}
+
+		return ep, CheckError{
+			Host: err,
+		}
+	}
+
+	// Reserve the normalized endpoint before performing slow network I/O.
+	// Store.Insert performs the duplicate check atomically, so concurrent
+	// Add calls for the same URL cannot all execute the probes.
 	if err := s.store.Insert(ep); err != nil {
 		return Endpoint{}, err
+	}
+
+	lastCheck, checkErr := s.check(parsedURL, ips)
+	ep.LastCheck = lastCheck
+
+	if err := s.store.UpdateLastCheck(ep.ID, lastCheck); err != nil {
+		return ep, err
 	}
 
 	return ep, checkErr
@@ -95,7 +92,15 @@ func (s *Service) Refresh(id uuid.UUID) (CheckResult, error) {
 
 	ips, err := s.validateEndpointHost(parsedURL)
 	if err != nil {
-		return CheckResult{}, err
+		lastCheck := hostFailureResult(parsedURL)
+
+		if updateErr := s.store.UpdateLastCheck(id, lastCheck); updateErr != nil {
+			return lastCheck, updateErr
+		}
+
+		return lastCheck, CheckError{
+			Host: err,
+		}
 	}
 
 	lastCheck, checkErr := s.check(parsedURL, ips)
@@ -135,4 +140,36 @@ func (s *Service) validateEndpointHost(parsedURL *url.URL) ([]netip.Addr, error)
 	}
 
 	return nil, fmt.Errorf("validate endpoint host: %w", err)
+}
+
+// check runs the HTTP and TLS probes independently so both results and
+// failures are preserved.
+func (s *Service) check(parsedURL *url.URL, ips []netip.Addr) (CheckResult, error) {
+	httpResult, httpErr := s.probeHTTP(parsedURL, ips)
+	tlsResult, tlsErr := s.probeTLS(parsedURL, ips)
+
+	result := CheckResult{
+		HTTP: httpResult,
+		TLS:  tlsResult,
+	}
+
+	if httpErr != nil || tlsErr != nil {
+		return result, CheckError{
+			HTTP: httpErr,
+			TLS:  tlsErr,
+		}
+	}
+
+	return result, nil
+}
+
+func hostFailureResult(parsedURL *url.URL) CheckResult {
+	return CheckResult{
+		HTTP: probe.HTTPResult{
+			CheckedAt: time.Now(),
+		},
+		TLS: probe.TLSResult{
+			Enabled: parsedURL.Scheme == "https",
+		},
+	}
 }

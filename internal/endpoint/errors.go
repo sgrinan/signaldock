@@ -16,12 +16,15 @@ var (
 
 // CheckError contains failures produced by the HTTP and TLS checks.
 type CheckError struct {
+	Host error
 	HTTP error
 	TLS  error
 }
 
 func (err CheckError) Error() string {
 	switch {
+	case err.Host != nil:
+		return "host check failed"
 	case err.HTTP != nil && err.TLS != nil:
 		return "HTTP and TLS checks failed"
 	case err.HTTP != nil:
@@ -35,6 +38,10 @@ func (err CheckError) Error() string {
 
 func (err CheckError) Unwrap() []error {
 	var errs []error
+
+	if err.Host != nil {
+		errs = append(errs, err.Host)
+	}
 
 	if err.HTTP != nil {
 		errs = append(errs, err.HTTP)

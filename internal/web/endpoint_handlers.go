@@ -82,6 +82,22 @@ func (h *handler) handlePostEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	case errors.As(err, &checkErr):
 		switch {
+
+		case checkErr.TLS != nil &&
+			added.LastCheck.TLS.Enabled &&
+			!added.LastCheck.TLS.Valid &&
+			!added.LastCheck.TLS.ExpiresAt.IsZero():
+
+			h.logger.Warn("endpoint TLS certificate validation failed", "id", added.ID, "error", checkErr.TLS)
+
+			http.Redirect(w, r, "/?result=tls-invalid", http.StatusSeeOther)
+			return
+
+		case checkErr.Host != nil:
+			h.logger.Warn("endpoint host check failed", "id", added.ID, "error", checkErr.Host)
+
+			http.Redirect(w, r, "/?result=unreachable", http.StatusSeeOther)
+
 		case checkErr.HTTP != nil && checkErr.TLS != nil:
 			h.logger.Warn("endpoint HTTP and TLS checks failed", "id", added.ID, "http_error", checkErr.HTTP, "tls_error", checkErr.TLS)
 
@@ -222,7 +238,7 @@ func (h *handler) handleRefreshEndpoint(w http.ResponseWriter, r *http.Request) 
 		return
 
 	case errors.As(err, &checkErr):
-		h.logger.Warn("endpoint refresh completed with check errors", "id", id, "http_error", checkErr.HTTP, "tls_error", checkErr.TLS)
+		h.logger.Warn("endpoint refresh completed with check errors", "id", id, "host_error", checkErr.Host, "http_error", checkErr.HTTP, "tls_error", checkErr.TLS)
 
 	default:
 		h.logger.Error("endpoint refresh failed", "id", id, "error", err)

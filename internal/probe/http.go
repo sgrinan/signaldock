@@ -2,6 +2,7 @@ package probe
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -16,6 +17,43 @@ const (
 	requestTimeout = 5 * time.Second
 	maxRedirects   = 10
 )
+
+// HTTP probes an endpoint and reports whether an HTTP response was received.
+func HTTP(parsedURL *url.URL, ips []netip.Addr) (HTTPResult, error) {
+	if len(ips) == 0 {
+		return HTTPResult{}, ErrUnsafeHost
+	}
+
+	resp, latency, err := doRequest(parsedURL, ips)
+	checkedAt := time.Now()
+
+	if err != nil {
+		result := HTTPResult{
+			Latency:   latency,
+			CheckedAt: checkedAt,
+		}
+
+		if resp != nil {
+			result.StatusCode = resp.StatusCode
+			result.Responded = true
+
+			if resp.Body != nil {
+				resp.Body.Close()
+			}
+		}
+
+		return result, err
+	}
+
+	defer resp.Body.Close()
+
+	return HTTPResult{
+		StatusCode: resp.StatusCode,
+		Latency:    latency,
+		Responded:  true,
+		CheckedAt:  checkedAt,
+	}, nil
+}
 
 func newHTTPClient(parsedURL *url.URL, ips []netip.Addr) (*http.Client, error) {
 	if len(ips) == 0 {
@@ -71,6 +109,8 @@ func newHTTPClient(parsedURL *url.URL, ips []netip.Addr) (*http.Client, error) {
 		Transport: transport,
 		Timeout:   requestTimeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			req.Header.Del("Referer")
+
 			if len(via) >= maxRedirects {
 				return ErrTooManyRedirects
 			}
@@ -116,34 +156,17 @@ func doRequest(parsedURL *url.URL, ips []netip.Addr) (*http.Response, time.Durat
 	latency := time.Since(start)
 
 	if err != nil {
-		return nil, latency, fmt.Errorf("HTTP request: %w", err)
+		return resp, latency, fmt.Errorf("HTTP request: %w", sanitizeRequestError(err))
 	}
 
 	return resp, latency, nil
 }
 
-// HTTP probes an endpoint and reports whether an HTTP response was received.
-func HTTP(parsedURL *url.URL, ips []netip.Addr) (HTTPResult, error) {
-	if len(ips) == 0 {
-		return HTTPResult{}, ErrUnsafeHost
+func sanitizeRequestError(err error) error {
+
+	if urlErr, ok := errors.AsType[*url.Error](err); ok {
+		return urlErr.Err
 	}
 
-	resp, latency, err := doRequest(parsedURL, ips)
-	checkedAt := time.Now()
-
-	if err != nil {
-		return HTTPResult{
-			Latency:   latency,
-			Responded: false,
-			CheckedAt: checkedAt,
-		}, err
-	}
-	defer resp.Body.Close()
-
-	return HTTPResult{
-		StatusCode: resp.StatusCode,
-		Latency:    latency,
-		Responded:  true,
-		CheckedAt:  checkedAt,
-	}, nil
+	return err
 }

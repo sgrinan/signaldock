@@ -15,6 +15,7 @@ import (
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/endpoint"
+	"github.com/sgrinan/signaldock/internal/probe"
 )
 
 type fakeEndpointService struct {
@@ -305,6 +306,51 @@ func TestHandler_HandlePostEndpoint_InvalidCSRF(t *testing.T) {
 
 	if called {
 		t.Error("handlePostEndpoint() called Add() with invalid CSRF token")
+	}
+}
+
+func TestHandler_HandlePostEndpoint_InvalidTLSCertificate(t *testing.T) {
+	httpErr := errors.New("http probe failed")
+	tlsErr := errors.New("certificate validation failed")
+
+	added := endpoint.Endpoint{
+		ID:  uuid.NewV7(),
+		URL: "https://example.com/",
+		LastCheck: endpoint.CheckResult{
+			TLS: probe.TLSResult{
+				Enabled:       true,
+				Valid:         false,
+				ExpiresAt:     time.Now().Add(30 * 24 * time.Hour),
+				DaysRemaining: 30,
+			},
+		},
+	}
+
+	service := &fakeEndpointService{
+		addFunc: func(string) (endpoint.Endpoint, error) {
+			return added, endpoint.CheckError{
+				HTTP: httpErr,
+				TLS:  tlsErr,
+			}
+		},
+	}
+
+	h := newTestHandler(service)
+
+	req := newCSRFPostRequest(t, "/endpoints", url.Values{
+		"url": []string{"https://example.com"},
+	})
+
+	recorder := httptest.NewRecorder()
+
+	h.handlePostEndpoint(recorder, req)
+
+	if recorder.Code != http.StatusSeeOther {
+		t.Errorf("handlePostEndpoint() status = %d, want %d", recorder.Code, http.StatusSeeOther)
+	}
+
+	if got := recorder.Header().Get("Location"); got != "/?result=tls-invalid" {
+		t.Errorf("handlePostEndpoint() Location = %q, want %q", got, "/?result=tls-invalid")
 	}
 }
 

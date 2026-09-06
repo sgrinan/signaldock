@@ -15,18 +15,18 @@ var sharedAddressPrefix = netip.MustParsePrefix("100.64.0.0/10")
 
 type lookupNetIPFunc func(context.Context, string, string) ([]netip.Addr, error)
 
+// ValidateHost resolves host and rejects local, private, and other
+// disallowed destinations for outbound probes.
+func ValidateHost(host string) ([]netip.Addr, error) {
+	return validateHost(host, net.DefaultResolver.LookupNetIP)
+}
+
 func isUnsafeAddr(addr netip.Addr) bool {
 	addr = addr.Unmap()
 
 	return !addr.IsGlobalUnicast() ||
 		addr.IsPrivate() ||
 		sharedAddressPrefix.Contains(addr)
-}
-
-// ValidateHost resolves host and rejects local, private, and other
-// disallowed destinations for outbound probes.
-func ValidateHost(host string) ([]netip.Addr, error) {
-	return validateHost(host, net.DefaultResolver.LookupNetIP)
 }
 
 func validateHost(host string, lookup lookupNetIPFunc) ([]netip.Addr, error) {

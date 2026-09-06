@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"strings"
 	"testing"
 )
 
@@ -20,10 +21,7 @@ func TestNewHTTPClient(t *testing.T) {
 	})
 
 	t.Run("too_many_redirects", func(t *testing.T) {
-		client, err := newHTTPClient(
-			parsedURL,
-			[]netip.Addr{netip.MustParseAddr("8.8.8.8")},
-		)
+		client, err := newHTTPClient(parsedURL, []netip.Addr{netip.MustParseAddr("8.8.8.8")})
 		if err != nil {
 			t.Fatalf("newHTTPClient() returned unexpected error: %v", err)
 		}
@@ -97,6 +95,31 @@ func TestNewHTTPClient(t *testing.T) {
 			t.Errorf("CheckRedirect() error = %v, want %v", err, ErrUnsafeHost)
 		}
 	})
+
+	t.Run("removes_referer", func(t *testing.T) {
+		client, err := newHTTPClient(parsedURL, []netip.Addr{netip.MustParseAddr("8.8.8.8")})
+		if err != nil {
+			t.Fatalf("newHTTPClient() returned unexpected error: %v", err)
+		}
+
+		redirectURL := mustParseURL(t, "https://8.8.8.8/redirected")
+
+		req := &http.Request{
+			URL:    redirectURL,
+			Header: make(http.Header),
+		}
+
+		req.Header.Set("Referer", "https://example.com/health?token=super-secret-token")
+
+		err = client.CheckRedirect(req, nil)
+		if err != nil {
+			t.Fatalf("CheckRedirect() returned unexpected error: %v", err)
+		}
+
+		if referer := req.Header.Get("Referer"); referer != "" {
+			t.Errorf("CheckRedirect() Referer = %q, want empty", referer)
+		}
+	})
 }
 
 func TestHTTP(t *testing.T) {
@@ -137,13 +160,17 @@ func TestHTTP_RequestError(t *testing.T) {
 	)
 
 	parsedURL := mustParseURL(t, server.URL)
+	parsedURL.RawQuery = "token=super-secret-token"
 
 	server.Close()
 
 	got, err := HTTP(parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
-
 	if err == nil {
 		t.Fatalf("HTTP(%q) error = nil, want non-nil", parsedURL)
+	}
+
+	if strings.Contains(err.Error(), "super-secret-token") {
+		t.Errorf("HTTP() error leaked URL query secret: %v", err)
 	}
 
 	if got.Responded {
@@ -166,5 +193,30 @@ func TestHTTP_NoAddresses(t *testing.T) {
 
 	if got != (HTTPResult{}) {
 		t.Errorf("HTTP(%q, nil) = %+v, want zero HTTPResult", parsedURL, got)
+	}
+}
+
+func TestHTTP_BlockedRedirectPreservesResponse(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "http://127.0.0.1/", http.StatusFound)
+		}),
+	)
+	t.Cleanup(server.Close)
+
+	parsedURL := mustParseURL(t, server.URL)
+
+	got, err := HTTP(parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
+
+	if !errors.Is(err, ErrUnsafeHost) {
+		t.Fatalf("HTTP(%q) error = %v, want %v", parsedURL, err, ErrUnsafeHost)
+	}
+
+	if !got.Responded {
+		t.Errorf("HTTP(%q).Responded = false, want true", parsedURL)
+	}
+
+	if got.StatusCode != http.StatusFound {
+		t.Errorf("HTTP(%q).StatusCode = %d, want %d", parsedURL, got.StatusCode, http.StatusFound)
 	}
 }
