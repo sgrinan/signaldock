@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+// isUnsafeAddr
+
 func TestIsUnsafeAddr(t *testing.T) {
 	tests := []struct {
 		name string
@@ -77,127 +79,139 @@ func TestIsUnsafeAddr(t *testing.T) {
 	}
 }
 
+// ValidateHost
+
 func TestValidateHost(t *testing.T) {
 	t.Run("public_ip", func(t *testing.T) {
-		got, err := ValidateHost("8.8.8.8")
+		const host = "8.8.8.8"
+
+		got, err := ValidateHost(host)
 		if err != nil {
-			t.Fatalf("ValidateHost(%q) returned unexpected error: %v", "8.8.8.8", err)
+			t.Fatalf("ValidateHost(%q) returned unexpected error: %v", host, err)
 		}
 
-		want := netip.MustParseAddr("8.8.8.8")
+		want := netip.MustParseAddr(host)
 
-		if len(got) != 1 {
-			t.Fatalf("len(ValidateHost()) = %d, want 1", len(got))
+		if gotLen, wantLen := len(got), 1; gotLen != wantLen {
+			t.Fatalf("len(ValidateHost(%q)) = %d, want %d", host, gotLen, wantLen)
 		}
 
 		if got[0] != want {
-			t.Errorf("ValidateHost(%q)[0] = %v, want %v", "8.8.8.8", got[0], want)
+			t.Errorf("ValidateHost(%q)[0] = %v, want %v", host, got[0], want)
 		}
 	})
 
 	t.Run("unsafe_ip", func(t *testing.T) {
-		_, err := ValidateHost("127.0.0.1")
+		const host = "127.0.0.1"
+
+		_, err := ValidateHost(host)
 
 		if !errors.Is(err, ErrUnsafeHost) {
-			t.Errorf("ValidateHost(%q) error = %v, want %v", "127.0.0.1", err, ErrUnsafeHost)
+			t.Errorf("ValidateHost(%q) error = %v, want %v", host, err, ErrUnsafeHost)
 		}
 	})
 
 	t.Run("unmaps_ipv4", func(t *testing.T) {
-		got, err := ValidateHost("::ffff:8.8.8.8")
+		const host = "::ffff:8.8.8.8"
+
+		got, err := ValidateHost(host)
 		if err != nil {
-			t.Fatalf("ValidateHost(%q) returned unexpected error: %v", "::ffff:8.8.8.8", err)
+			t.Fatalf("ValidateHost(%q) returned unexpected error: %v", host, err)
 		}
 
 		want := netip.MustParseAddr("8.8.8.8")
 
+		if gotLen, wantLen := len(got), 1; gotLen != wantLen {
+			t.Fatalf("len(ValidateHost(%q)) = %d, want %d", host, gotLen, wantLen)
+		}
+
 		if got[0] != want {
-			t.Errorf("ValidateHost(%q)[0] = %v, want %v", "::ffff:8.8.8.8", got[0], want)
+			t.Errorf("ValidateHost(%q)[0] = %v, want %v", host, got[0], want)
 		}
 	})
 }
 
-func TestValidateHost_DNS(t *testing.T) {
-	t.Run("public_addresses", func(t *testing.T) {
-		want := []netip.Addr{
-			netip.MustParseAddr("8.8.8.8"),
-			netip.MustParseAddr("2606:4700:4700::1111"),
-		}
+// validateHost
 
-		lookup := func(context.Context, string, string) ([]netip.Addr, error) {
-			return append([]netip.Addr(nil), want...), nil
-		}
+func TestValidateHostWithLookup(t *testing.T) {
+	publicIPv4 := netip.MustParseAddr("8.8.8.8")
+	publicIPv6 := netip.MustParseAddr("2606:4700:4700::1111")
+	mappedIPv4 := netip.MustParseAddr("::ffff:8.8.8.8")
+	unsafeIPv4 := netip.MustParseAddr("127.0.0.1")
 
-		got, err := validateHost("example.com", lookup)
-		if err != nil {
-			t.Fatalf("validateHost() returned unexpected error: %v", err)
-		}
+	lookupErr := errors.New("lookup failed")
 
-		if !slices.Equal(got, want) {
-			t.Errorf("validateHost() = %v, want %v", got, want)
-		}
-	})
+	tests := []struct {
+		name      string
+		resolved  []netip.Addr
+		lookupErr error
+		want      []netip.Addr
+		wantErr   error
+	}{
+		{
+			name: "public_addresses",
+			resolved: []netip.Addr{
+				publicIPv4,
+				publicIPv6,
+			},
+			want: []netip.Addr{
+				publicIPv4,
+				publicIPv6,
+			},
+		},
+		{
+			name: "unmaps_resolved_ipv4",
+			resolved: []netip.Addr{
+				mappedIPv4,
+			},
+			want: []netip.Addr{
+				publicIPv4,
+			},
+		},
+		{
+			name: "contains_unsafe_address",
+			resolved: []netip.Addr{
+				publicIPv4,
+				unsafeIPv4,
+			},
+			wantErr: ErrUnsafeHost,
+		},
+		{
+			name:    "no_addresses",
+			wantErr: ErrNoResolvedAddresses,
+		},
+		{
+			name:      "resolver_error",
+			lookupErr: lookupErr,
+			wantErr:   lookupErr,
+		},
+	}
 
-	t.Run("unmaps_resolved_ipv4", func(t *testing.T) {
-		lookup := func(context.Context, string, string) ([]netip.Addr, error) {
-			return []netip.Addr{
-				netip.MustParseAddr("::ffff:8.8.8.8"),
-			}, nil
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const host = "example.com"
 
-		got, err := validateHost("example.com", lookup)
-		if err != nil {
-			t.Fatalf("validateHost() returned unexpected error: %v", err)
-		}
+			lookup := func(context.Context, string, string) ([]netip.Addr, error) {
+				return append([]netip.Addr(nil), tt.resolved...), tt.lookupErr
+			}
 
-		want := netip.MustParseAddr("8.8.8.8")
+			got, err := validateHost(host, lookup)
 
-		if len(got) != 1 {
-			t.Fatalf("len(validateHost()) = %d, want 1", len(got))
-		}
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("validateHost(%q) error = %v, want %v", host, err, tt.wantErr)
+				}
 
-		if got[0] != want {
-			t.Errorf("validateHost()[0] = %v, want %v", got[0], want)
-		}
-	})
-	t.Run("contains_unsafe_address", func(t *testing.T) {
-		lookup := func(context.Context, string, string) ([]netip.Addr, error) {
-			return []netip.Addr{
-				netip.MustParseAddr("8.8.8.8"),
-				netip.MustParseAddr("127.0.0.1"),
-			}, nil
-		}
+				return
+			}
 
-		_, err := validateHost("example.com", lookup)
+			if err != nil {
+				t.Fatalf("validateHost(%q) returned unexpected error: %v", host, err)
+			}
 
-		if !errors.Is(err, ErrUnsafeHost) {
-			t.Errorf("validateHost() error = %v, want %v", err, ErrUnsafeHost)
-		}
-	})
-
-	t.Run("no_addresses", func(t *testing.T) {
-		lookup := func(context.Context, string, string) ([]netip.Addr, error) {
-			return nil, nil
-		}
-
-		_, err := validateHost("example.com", lookup)
-
-		if !errors.Is(err, ErrNoResolvedAddresses) {
-			t.Errorf("validateHost() error = %v, want %v", err, ErrNoResolvedAddresses)
-		}
-	})
-
-	t.Run("resolver_error", func(t *testing.T) {
-		wantErr := errors.New("lookup failed")
-
-		lookup := func(context.Context, string, string) ([]netip.Addr, error) {
-			return nil, wantErr
-		}
-
-		_, err := validateHost("example.com", lookup)
-
-		if !errors.Is(err, wantErr) {
-			t.Errorf("validateHost() error = %v, want error wrapping %v", err, wantErr)
-		}
-	})
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("validateHost(%q) = %v, want %v", host, got, tt.want)
+			}
+		})
+	}
 }

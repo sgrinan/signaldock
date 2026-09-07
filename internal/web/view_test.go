@@ -11,21 +11,15 @@ import (
 	"github.com/sgrinan/signaldock/internal/probe"
 )
 
+// newEndpointListItem
+
 func TestNewEndpointListItem(t *testing.T) {
 	checkedAt := time.Date(2026, time.September, 6, 18, 30, 0, 0, time.UTC)
 
 	tests := []struct {
 		name string
 		ep   endpoint.Endpoint
-
-		wantState            string
-		wantStateClass       string
-		wantHTTPStatus       string
-		wantHTTPState        string
-		wantLatency          string
-		wantLastCheckedAt    string
-		wantTLSState         string
-		wantTLSDaysRemaining string
+		want endpointListItem
 	}{
 		{
 			name: "checking",
@@ -33,13 +27,15 @@ func TestNewEndpointListItem(t *testing.T) {
 				ID:  uuid.NewV7(),
 				URL: "https://example.com/",
 			},
-			wantState:         "Checking",
-			wantStateClass:    "status-pending",
-			wantHTTPStatus:    "—",
-			wantHTTPState:     "Checking",
-			wantLatency:       "—",
-			wantLastCheckedAt: "Not checked yet",
-			wantTLSState:      "Checking",
+			want: endpointListItem{
+				State:         "Checking",
+				StateClass:    "status-pending",
+				HTTPStatus:    "—",
+				HTTPState:     "Checking",
+				Latency:       "—",
+				LastCheckedAt: "Not checked yet",
+				TLSState:      "Checking",
+			},
 		},
 		{
 			name: "responding_https_valid",
@@ -61,14 +57,16 @@ func TestNewEndpointListItem(t *testing.T) {
 					},
 				},
 			},
-			wantState:            "Responding",
-			wantStateClass:       "status-ok",
-			wantHTTPStatus:       "200",
-			wantHTTPState:        "Responded",
-			wantLatency:          "125 ms",
-			wantLastCheckedAt:    "18:30:00",
-			wantTLSState:         "Valid",
-			wantTLSDaysRemaining: "30 days remaining",
+			want: endpointListItem{
+				State:            "Responding",
+				StateClass:       "status-ok",
+				HTTPStatus:       "200",
+				HTTPState:        "Responded",
+				Latency:          "125 ms",
+				LastCheckedAt:    "18:30:00",
+				TLSState:         "Valid",
+				TLSDaysRemaining: "30 days remaining",
+			},
 		},
 		{
 			name: "no_http_response",
@@ -86,13 +84,15 @@ func TestNewEndpointListItem(t *testing.T) {
 					},
 				},
 			},
-			wantState:         "No response",
-			wantStateClass:    "status-error",
-			wantHTTPStatus:    "—",
-			wantHTTPState:     "No response",
-			wantLatency:       "0 ms",
-			wantLastCheckedAt: "18:30:00",
-			wantTLSState:      "Valid",
+			want: endpointListItem{
+				State:         "No response",
+				StateClass:    "status-error",
+				HTTPStatus:    "—",
+				HTTPState:     "No response",
+				Latency:       "0 ms",
+				LastCheckedAt: "18:30:00",
+				TLSState:      "Valid",
+			},
 		},
 		{
 			name: "invalid_tls",
@@ -113,14 +113,16 @@ func TestNewEndpointListItem(t *testing.T) {
 					},
 				},
 			},
-			wantState:            "TLS issue",
-			wantStateClass:       "status-warning",
-			wantHTTPStatus:       "200",
-			wantHTTPState:        "Responded",
-			wantLatency:          "0 ms",
-			wantLastCheckedAt:    "18:30:00",
-			wantTLSState:         "Invalid",
-			wantTLSDaysRemaining: "10 days remaining",
+			want: endpointListItem{
+				State:            "TLS issue",
+				StateClass:       "status-warning",
+				HTTPStatus:       "200",
+				HTTPState:        "Responded",
+				Latency:          "0 ms",
+				LastCheckedAt:    "18:30:00",
+				TLSState:         "Invalid",
+				TLSDaysRemaining: "10 days remaining",
+			},
 		},
 		{
 			name: "http_without_tls",
@@ -135,13 +137,15 @@ func TestNewEndpointListItem(t *testing.T) {
 					},
 				},
 			},
-			wantState:         "Responding",
-			wantStateClass:    "status-ok",
-			wantHTTPStatus:    "204",
-			wantHTTPState:     "Responded",
-			wantLatency:       "0 ms",
-			wantLastCheckedAt: "18:30:00",
-			wantTLSState:      "Not enabled",
+			want: endpointListItem{
+				State:         "Responding",
+				StateClass:    "status-ok",
+				HTTPStatus:    "204",
+				HTTPState:     "Responded",
+				Latency:       "0 ms",
+				LastCheckedAt: "18:30:00",
+				TLSState:      "Not enabled",
+			},
 		},
 		{
 			name: "tls_information_unavailable",
@@ -160,54 +164,34 @@ func TestNewEndpointListItem(t *testing.T) {
 					},
 				},
 			},
-			wantState:         "TLS issue",
-			wantStateClass:    "status-warning",
-			wantHTTPStatus:    "200",
-			wantHTTPState:     "Responded",
-			wantLatency:       "0 ms",
-			wantLastCheckedAt: "18:30:00",
-			wantTLSState:      "Unavailable",
+			want: endpointListItem{
+				State:         "TLS issue",
+				StateClass:    "status-warning",
+				HTTPStatus:    "200",
+				HTTPState:     "Responded",
+				Latency:       "0 ms",
+				LastCheckedAt: "18:30:00",
+				TLSState:      "Unavailable",
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			want := tt.want
+			want.ID = tt.ep.ID
+			want.URL = tt.ep.URL
+
 			got := newEndpointListItem(tt.ep)
 
-			if got.State != tt.wantState {
-				t.Errorf("State = %q, want %q", got.State, tt.wantState)
-			}
-
-			if got.StateClass != tt.wantStateClass {
-				t.Errorf("StateClass = %q, want %q", got.StateClass, tt.wantStateClass)
-			}
-
-			if got.HTTPStatus != tt.wantHTTPStatus {
-				t.Errorf("HTTPStatus = %q, want %q", got.HTTPStatus, tt.wantHTTPStatus)
-			}
-
-			if got.HTTPState != tt.wantHTTPState {
-				t.Errorf("HTTPState = %q, want %q", got.HTTPState, tt.wantHTTPState)
-			}
-
-			if got.Latency != tt.wantLatency {
-				t.Errorf("Latency = %q, want %q", got.Latency, tt.wantLatency)
-			}
-
-			if got.LastCheckedAt != tt.wantLastCheckedAt {
-				t.Errorf("LastCheckedAt = %q, want %q", got.LastCheckedAt, tt.wantLastCheckedAt)
-			}
-
-			if got.TLSState != tt.wantTLSState {
-				t.Errorf("TLSState = %q, want %q", got.TLSState, tt.wantTLSState)
-			}
-
-			if got.TLSDaysRemaining != tt.wantTLSDaysRemaining {
-				t.Errorf("TLSDaysRemaining = %q, want %q", got.TLSDaysRemaining, tt.wantTLSDaysRemaining)
+			if got != want {
+				t.Errorf("newEndpointListItem() = %+v, want %+v", got, want)
 			}
 		})
 	}
 }
+
+// newEndpointListItems
 
 func TestNewEndpointListItems(t *testing.T) {
 	first := endpoint.Endpoint{
@@ -220,20 +204,27 @@ func TestNewEndpointListItems(t *testing.T) {
 		URL: "https://second.example/",
 	}
 
-	got := newEndpointListItems([]endpoint.Endpoint{first, second})
+	got := newEndpointListItems(
+		[]endpoint.Endpoint{
+			first,
+			second,
+		},
+	)
 
-	if len(got) != 2 {
-		t.Fatalf("len(newEndpointListItems()) = %d, want 2", len(got))
+	if gotLen, wantLen := len(got), 2; gotLen != wantLen {
+		t.Fatalf("len(newEndpointListItems()) = %d, want %d", gotLen, wantLen)
 	}
 
 	if got[0].ID != first.ID {
-		t.Errorf("first ID = %v, want %v", got[0].ID, first.ID)
+		t.Errorf("newEndpointListItems()[0].ID = %v, want %v", got[0].ID, first.ID)
 	}
 
 	if got[1].ID != second.ID {
-		t.Errorf("second ID = %v, want %v", got[1].ID, second.ID)
+		t.Errorf("newEndpointListItems()[1].ID = %v, want %v", got[1].ID, second.ID)
 	}
 }
+
+// tlsExpiryClass
 
 func TestTLSExpiryClass(t *testing.T) {
 	tests := []struct {
@@ -270,9 +261,7 @@ func TestTLSExpiryClass(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tlsExpiryClass(tt.days)
-
-			if got != tt.want {
+			if got := tlsExpiryClass(tt.days); got != tt.want {
 				t.Errorf("tlsExpiryClass(%d) = %q, want %q", tt.days, got, tt.want)
 			}
 		})

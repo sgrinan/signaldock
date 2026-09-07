@@ -14,7 +14,7 @@ var (
 	ErrEndpointNotFound = errors.New("endpoint not found")
 )
 
-// CheckError contains failures produced by the HTTP and TLS checks.
+// CheckError contains failures produced by the host, HTTP, and TLS checks.
 type CheckError struct {
 	Host error
 	HTTP error

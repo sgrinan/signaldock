@@ -15,34 +15,7 @@ import (
 	"github.com/sgrinan/signaldock/internal/probe"
 )
 
-func newTestService() (*Service, *Store) {
-	store := NewStore()
-	s := NewService(store)
-
-	ips := []netip.Addr{
-		netip.MustParseAddr("203.0.113.10"),
-	}
-
-	s.validateHost = func(string) ([]netip.Addr, error) {
-		return ips, nil
-	}
-
-	s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
-		return probe.HTTPResult{
-			StatusCode: 200,
-			Responded:  true,
-		}, nil
-	}
-
-	s.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
-		return probe.TLSResult{
-			Enabled: true,
-			Valid:   true,
-		}, nil
-	}
-
-	return s, store
-}
+// Service.Add
 
 func TestService_Add(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
@@ -62,11 +35,11 @@ func TestService_Add(t *testing.T) {
 		}
 
 		if !got.LastCheck.HTTP.Responded {
-			t.Errorf("Add().LastCheck.HTTP.Responded = false, want true")
+			t.Error("Add().LastCheck.HTTP.Responded = false, want true")
 		}
 
 		if !got.LastCheck.TLS.Valid {
-			t.Errorf("Add().LastCheck.TLS.Valid = false, want true")
+			t.Error("Add().LastCheck.TLS.Valid = false, want true")
 		}
 
 		stored, err := store.ByID(got.ID)
@@ -82,14 +55,16 @@ func TestService_Add(t *testing.T) {
 	t.Run("invalid_url", func(t *testing.T) {
 		s, store := newTestService()
 
-		got, err := s.Add("ftp://example.com")
+		const rawURL = "ftp://example.com"
+
+		got, err := s.Add(rawURL)
 
 		if !errors.Is(err, ErrUnsupportedScheme) {
-			t.Errorf("Add(%q) error = %v, want %v", "ftp://example.com", err, ErrUnsupportedScheme)
+			t.Errorf("Add(%q) error = %v, want %v", rawURL, err, ErrUnsupportedScheme)
 		}
 
 		if got != (Endpoint{}) {
-			t.Errorf("Add() = %+v, want zero Endpoint", got)
+			t.Errorf("Add(%q) = %+v, want zero Endpoint", rawURL, got)
 		}
 
 		if got := len(store.List()); got != 0 {
@@ -104,18 +79,66 @@ func TestService_Add(t *testing.T) {
 			return nil, probe.ErrUnsafeHost
 		}
 
-		got, err := s.Add("https://example.com")
+		const rawURL = "https://example.com"
+
+		got, err := s.Add(rawURL)
 
 		if !errors.Is(err, ErrUnsafeHost) {
-			t.Errorf("Add() error = %v, want %v", err, ErrUnsafeHost)
+			t.Errorf("Add(%q) error = %v, want %v", rawURL, err, ErrUnsafeHost)
 		}
 
 		if got != (Endpoint{}) {
-			t.Errorf("Add() = %+v, want zero Endpoint", got)
+			t.Errorf("Add(%q) = %+v, want zero Endpoint", rawURL, got)
 		}
 
 		if got := len(store.List()); got != 0 {
 			t.Errorf("len(List()) = %d, want 0", got)
+		}
+	})
+
+	t.Run("host_check_error_stores_failed_result", func(t *testing.T) {
+		s, store := newTestService()
+
+		s.validateHost = func(string) ([]netip.Addr, error) {
+			return nil, probe.ErrNoResolvedAddresses
+		}
+
+		const rawURL = "https://example.com"
+
+		got, err := s.Add(rawURL)
+
+		var checkErr CheckError
+		if !errors.As(err, &checkErr) {
+			t.Fatalf("Add(%q) error = %v, want CheckError", rawURL, err)
+		}
+
+		if !errors.Is(err, probe.ErrNoResolvedAddresses) {
+			t.Errorf("Add(%q) error = %v, want %v", rawURL, err, probe.ErrNoResolvedAddresses)
+		}
+
+		if got.ID == uuid.Nil() {
+			t.Errorf("Add(%q).ID = %v, want non-zero UUID", rawURL, got.ID)
+		}
+
+		if got.LastCheck.HTTP.Responded {
+			t.Errorf("Add(%q).LastCheck.HTTP.Responded = true, want false", rawURL)
+		}
+
+		if got.LastCheck.HTTP.CheckedAt.IsZero() {
+			t.Errorf("Add(%q).LastCheck.HTTP.CheckedAt is zero, want check time", rawURL)
+		}
+
+		if !got.LastCheck.TLS.Enabled {
+			t.Errorf("Add(%q).LastCheck.TLS.Enabled = false, want true", rawURL)
+		}
+
+		stored, err := store.ByID(got.ID)
+		if err != nil {
+			t.Fatalf("ByID(%v) returned unexpected error: %v", got.ID, err)
+		}
+
+		if stored != got {
+			t.Errorf("ByID(%v) = %+v, want %+v", got.ID, stored, got)
 		}
 	})
 
@@ -130,15 +153,17 @@ func TestService_Add(t *testing.T) {
 			}, httpErr
 		}
 
-		got, err := s.Add("https://example.com")
+		const rawURL = "https://example.com"
+
+		got, err := s.Add(rawURL)
 
 		var checkErr CheckError
 		if !errors.As(err, &checkErr) {
-			t.Fatalf("Add() error = %v, want CheckError", err)
+			t.Fatalf("Add(%q) error = %v, want CheckError", rawURL, err)
 		}
 
 		if !errors.Is(err, httpErr) {
-			t.Errorf("errors.Is(Add() error, httpErr) = false, want true")
+			t.Errorf("errors.Is(Add(%q) error, httpErr) = false, want true", rawURL)
 		}
 
 		stored, err := store.ByID(got.ID)
@@ -154,14 +179,16 @@ func TestService_Add(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		s, store := newTestService()
 
-		first, err := s.Add("https://example.com")
+		const rawURL = "https://example.com"
+
+		first, err := s.Add(rawURL)
 		if err != nil {
-			t.Fatalf("first Add() returned unexpected error: %v", err)
+			t.Fatalf("first Add(%q) returned unexpected error: %v", rawURL, err)
 		}
 
-		_, err = s.Add("https://example.com")
+		_, err = s.Add(rawURL)
 		if !errors.Is(err, ErrEndpointExists) {
-			t.Errorf("second Add() error = %v, want %v", err, ErrEndpointExists)
+			t.Errorf("second Add(%q) error = %v, want %v", rawURL, err, ErrEndpointExists)
 		}
 
 		if got := len(store.List()); got != 1 {
@@ -177,89 +204,91 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("ByID(%v) = %+v, want %+v", first.ID, stored, first)
 		}
 	})
-
-	t.Run("concurrent_duplicate_runs_probes_once", func(t *testing.T) {
-		s, store := newTestService()
-
-		const goroutines = 10
-
-		var httpCalls atomic.Int32
-		var tlsCalls atomic.Int32
-
-		s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
-			httpCalls.Add(1)
-
-			time.Sleep(50 * time.Millisecond)
-
-			return probe.HTTPResult{
-				StatusCode: http.StatusOK,
-				Responded:  true,
-			}, nil
-		}
-
-		s.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
-			tlsCalls.Add(1)
-
-			return probe.TLSResult{
-				Enabled: true,
-				Valid:   true,
-			}, nil
-		}
-
-		var wg sync.WaitGroup
-		wg.Add(goroutines)
-
-		errs := make(chan error, goroutines)
-
-		for range goroutines {
-			go func() {
-				defer wg.Done()
-
-				_, err := s.Add("https://example.com")
-				errs <- err
-			}()
-		}
-
-		wg.Wait()
-		close(errs)
-
-		var successCount int
-		var duplicateCount int
-
-		for err := range errs {
-			switch {
-			case err == nil:
-				successCount++
-
-			case errors.Is(err, ErrEndpointExists):
-				duplicateCount++
-
-			default:
-				t.Errorf("Add() returned unexpected error: %v", err)
-			}
-		}
-
-		if successCount != 1 {
-			t.Errorf("successful Add() calls = %d, want 1", successCount)
-		}
-
-		if duplicateCount != goroutines-1 {
-			t.Errorf("duplicate Add() calls = %d, want %d", duplicateCount, goroutines-1)
-		}
-
-		if got := len(store.List()); got != 1 {
-			t.Errorf("len(List()) = %d, want 1", got)
-		}
-
-		if got := httpCalls.Load(); got != 1 {
-			t.Errorf("HTTP probe calls = %d, want 1", got)
-		}
-
-		if got := tlsCalls.Load(); got != 1 {
-			t.Errorf("TLS probe calls = %d, want 1", got)
-		}
-	})
 }
+
+func TestService_AddConcurrentDuplicate(t *testing.T) {
+	s, store := newTestService()
+
+	const goroutines = 10
+
+	var httpCalls atomic.Int32
+	var tlsCalls atomic.Int32
+
+	s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
+		httpCalls.Add(1)
+
+		time.Sleep(50 * time.Millisecond)
+
+		return probe.HTTPResult{
+			StatusCode: http.StatusOK,
+			Responded:  true,
+		}, nil
+	}
+
+	s.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		tlsCalls.Add(1)
+
+		return probe.TLSResult{
+			Enabled: true,
+			Valid:   true,
+		}, nil
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+
+	errs := make(chan error, goroutines)
+
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+
+			_, err := s.Add("https://example.com")
+			errs <- err
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	successes := 0
+	duplicates := 0
+
+	for err := range errs {
+		switch {
+		case err == nil:
+			successes++
+
+		case errors.Is(err, ErrEndpointExists):
+			duplicates++
+
+		default:
+			t.Errorf("Add() returned unexpected error: %v", err)
+		}
+	}
+
+	if got, want := successes, 1; got != want {
+		t.Errorf("successful Add() calls = %d, want %d", got, want)
+	}
+
+	if got, want := duplicates, goroutines-1; got != want {
+		t.Errorf("duplicate Add() calls = %d, want %d", got, want)
+	}
+
+	if got, want := len(store.List()), 1; got != want {
+		t.Errorf("len(List()) = %d, want %d", got, want)
+	}
+
+	if got, want := httpCalls.Load(), int32(1); got != want {
+		t.Errorf("HTTP probe calls = %d, want %d", got, want)
+	}
+
+	if got, want := tlsCalls.Load(), int32(1); got != want {
+		t.Errorf("TLS probe calls = %d, want %d", got, want)
+	}
+}
+
+// Service.Refresh
 
 func TestService_Refresh(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
@@ -320,10 +349,68 @@ func TestService_Refresh(t *testing.T) {
 		}
 	})
 
+	t.Run("host_check_error_updates_result", func(t *testing.T) {
+		s, store := newTestService()
+
+		ep := testEndpoint("https://example.com/")
+		ep.LastCheck = CheckResult{
+			HTTP: probe.HTTPResult{
+				StatusCode: 200,
+				Responded:  true,
+				CheckedAt:  time.Now().Add(-time.Minute),
+			},
+			TLS: probe.TLSResult{
+				Enabled: true,
+				Valid:   true,
+			},
+		}
+
+		if err := store.Insert(ep); err != nil {
+			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
+		}
+
+		s.validateHost = func(string) ([]netip.Addr, error) {
+			return nil, probe.ErrNoResolvedAddresses
+		}
+
+		got, err := s.Refresh(ep.ID)
+
+		var checkErr CheckError
+		if !errors.As(err, &checkErr) {
+			t.Fatalf("Refresh(%v) error = %v, want CheckError", ep.ID, err)
+		}
+
+		if !errors.Is(err, probe.ErrNoResolvedAddresses) {
+			t.Errorf("Refresh(%v) error = %v, want %v", ep.ID, err, probe.ErrNoResolvedAddresses)
+		}
+
+		if got.HTTP.Responded {
+			t.Errorf("Refresh(%v).HTTP.Responded = true, want false", ep.ID)
+		}
+
+		if got.HTTP.CheckedAt.IsZero() {
+			t.Errorf("Refresh(%v).HTTP.CheckedAt is zero, want check time", ep.ID)
+		}
+
+		if !got.TLS.Enabled {
+			t.Errorf("Refresh(%v).TLS.Enabled = false, want true", ep.ID)
+		}
+
+		stored, err := store.ByID(ep.ID)
+		if err != nil {
+			t.Fatalf("ByID(%v) returned unexpected error: %v", ep.ID, err)
+		}
+
+		if stored.LastCheck != got {
+			t.Errorf("ByID(%v).LastCheck = %+v, want %+v", ep.ID, stored.LastCheck, got)
+		}
+	})
+
 	t.Run("check_error_updates_result", func(t *testing.T) {
 		s, store := newTestService()
 
 		ep := testEndpoint("https://example.com/")
+
 		if err := store.Insert(ep); err != nil {
 			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
 		}
@@ -357,4 +444,35 @@ func TestService_Refresh(t *testing.T) {
 			t.Errorf("ByID(%v).LastCheck = %+v, want %+v", ep.ID, stored.LastCheck, got)
 		}
 	})
+}
+
+// Test helpers
+
+func newTestService() (*Service, *Store) {
+	store := NewStore()
+	s := NewService(store)
+
+	ips := []netip.Addr{
+		netip.MustParseAddr("203.0.113.10"),
+	}
+
+	s.validateHost = func(string) ([]netip.Addr, error) {
+		return ips, nil
+	}
+
+	s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
+		return probe.HTTPResult{
+			StatusCode: 200,
+			Responded:  true,
+		}, nil
+	}
+
+	s.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		return probe.TLSResult{
+			Enabled: true,
+			Valid:   true,
+		}, nil
+	}
+
+	return s, store
 }

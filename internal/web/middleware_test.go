@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+// securityHeaders
+
 func TestSecurityHeaders(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -18,19 +20,31 @@ func TestSecurityHeaders(t *testing.T) {
 
 	handler.ServeHTTP(recorder, req)
 
-	headers := map[string]string{
-		"X-Content-Type-Options":  "nosniff",
-		"Content-Security-Policy": "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
-		"Referrer-Policy":         "no-referrer",
+	headers := []struct {
+		name string
+		want string
+	}{
+		{
+			name: "X-Content-Type-Options",
+			want: "nosniff",
+		},
+		{
+			name: "Content-Security-Policy",
+			want: "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+		},
+		{
+			name: "Referrer-Policy",
+			want: "no-referrer",
+		},
 	}
 
-	for name, want := range headers {
-		if got := recorder.Header().Get(name); got != want {
-			t.Errorf("securityHeaders() %s = %q, want %q", name, got, want)
+	for _, tt := range headers {
+		if got := recorder.Header().Get(tt.name); got != tt.want {
+			t.Errorf("securityHeaders() %s = %q, want %q", tt.name, got, tt.want)
 		}
 	}
 
-	if recorder.Code != http.StatusNoContent {
-		t.Errorf("securityHeaders() status = %d, want %d", recorder.Code, http.StatusNoContent)
+	if got, want := recorder.Code, http.StatusNoContent; got != want {
+		t.Errorf("securityHeaders() status = %d, want %d", got, want)
 	}
 }

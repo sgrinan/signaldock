@@ -5,7 +5,10 @@ import (
 	"testing"
 )
 
+// CheckError.Error
+
 func TestCheckError_Error(t *testing.T) {
+	hostErr := errors.New("host failed")
 	httpErr := errors.New("http failed")
 	tlsErr := errors.New("tls failed")
 
@@ -14,6 +17,13 @@ func TestCheckError_Error(t *testing.T) {
 		err  CheckError
 		want string
 	}{
+		{
+			name: "host_only",
+			err: CheckError{
+				Host: hostErr,
+			},
+			want: "host check failed",
+		},
 		{
 			name: "http_and_tls",
 			err: CheckError{
@@ -52,25 +62,33 @@ func TestCheckError_Error(t *testing.T) {
 	}
 }
 
+// CheckError.Unwrap
+
 func TestCheckError_Unwrap(t *testing.T) {
+	hostErr := errors.New("host failed")
 	httpErr := errors.New("http failed")
 	tlsErr := errors.New("tls failed")
 	otherErr := errors.New("other")
 
 	err := CheckError{
+		Host: hostErr,
 		HTTP: httpErr,
 		TLS:  tlsErr,
 	}
 
+	if !errors.Is(err, hostErr) {
+		t.Error("errors.Is(CheckError, hostErr) = false, want true")
+	}
+
 	if !errors.Is(err, httpErr) {
-		t.Errorf("errors.Is(CheckError, httpErr) = false, want true")
+		t.Error("errors.Is(CheckError, httpErr) = false, want true")
 	}
 
 	if !errors.Is(err, tlsErr) {
-		t.Errorf("errors.Is(CheckError, tlsErr) = false, want true")
+		t.Error("errors.Is(CheckError, tlsErr) = false, want true")
 	}
 
 	if errors.Is(err, otherErr) {
-		t.Errorf("errors.Is(CheckError, otherErr) = true, want false")
+		t.Error("errors.Is(CheckError, otherErr) = true, want false")
 	}
 }

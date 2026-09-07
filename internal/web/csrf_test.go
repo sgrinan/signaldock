@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+// generateCSRFToken
+
 func TestGenerateCSRFToken(t *testing.T) {
 	token, err := generateCSRFToken()
 	if err != nil {
@@ -20,9 +22,11 @@ func TestGenerateCSRFToken(t *testing.T) {
 	}
 
 	if _, err := hex.DecodeString(token); err != nil {
-		t.Errorf("generateCSRFToken() = %q, want hexadecimal token", token)
+		t.Error("generateCSRFToken() returned non-hexadecimal token")
 	}
 }
+
+// getCSRFToken
 
 func TestGetCSRFToken(t *testing.T) {
 	t.Run("creates_token", func(t *testing.T) {
@@ -39,30 +43,30 @@ func TestGetCSRFToken(t *testing.T) {
 		}
 
 		cookies := recorder.Result().Cookies()
-		if len(cookies) != 1 {
-			t.Fatalf("getCSRFToken() set %d cookies, want 1", len(cookies))
+		if got, want := len(cookies), 1; got != want {
+			t.Fatalf("getCSRFToken() set %d cookies, want %d", got, want)
 		}
 
 		cookie := cookies[0]
 
-		if cookie.Name != csrfCookieName {
-			t.Errorf("CSRF cookie name = %q, want %q", cookie.Name, csrfCookieName)
+		if got, want := cookie.Name, csrfCookieName; got != want {
+			t.Errorf("CSRF cookie Name = %q, want %q", got, want)
 		}
 
-		if cookie.Value != token {
-			t.Errorf("CSRF cookie value = %q, want %q", cookie.Value, token)
+		if got, want := cookie.Value, token; got != want {
+			t.Errorf("CSRF cookie Value = %q, want generated token", got)
 		}
 
-		if cookie.Path != "/" {
-			t.Errorf("CSRF cookie Path = %q, want %q", cookie.Path, "/")
+		if got, want := cookie.Path, "/"; got != want {
+			t.Errorf("CSRF cookie Path = %q, want %q", got, want)
 		}
 
 		if !cookie.HttpOnly {
 			t.Error("CSRF cookie HttpOnly = false, want true")
 		}
 
-		if cookie.SameSite != http.SameSiteStrictMode {
-			t.Errorf("CSRF cookie SameSite = %v, want %v", cookie.SameSite, http.SameSiteStrictMode)
+		if got, want := cookie.SameSite, http.SameSiteStrictMode; got != want {
+			t.Errorf("CSRF cookie SameSite = %v, want %v", got, want)
 		}
 
 		if cookie.Secure {
@@ -71,10 +75,12 @@ func TestGetCSRFToken(t *testing.T) {
 	})
 
 	t.Run("reuses_existing_token", func(t *testing.T) {
+		const token = "existing-token"
+
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.AddCookie(&http.Cookie{
 			Name:  csrfCookieName,
-			Value: "existing-token",
+			Value: token,
 		})
 
 		recorder := httptest.NewRecorder()
@@ -84,12 +90,12 @@ func TestGetCSRFToken(t *testing.T) {
 			t.Fatalf("getCSRFToken() returned unexpected error: %v", err)
 		}
 
-		if got != "existing-token" {
-			t.Errorf("getCSRFToken() = %q, want %q", got, "existing-token")
+		if got != token {
+			t.Errorf("getCSRFToken() = %q, want %q", got, token)
 		}
 
-		if cookies := recorder.Result().Cookies(); len(cookies) != 0 {
-			t.Errorf("getCSRFToken() set %d cookies, want 0", len(cookies))
+		if got := len(recorder.Result().Cookies()); got != 0 {
+			t.Errorf("getCSRFToken() set %d cookies, want 0", got)
 		}
 	})
 
@@ -103,8 +109,8 @@ func TestGetCSRFToken(t *testing.T) {
 		}
 
 		cookies := recorder.Result().Cookies()
-		if len(cookies) != 1 {
-			t.Fatalf("getCSRFToken() set %d cookies, want 1", len(cookies))
+		if got, want := len(cookies), 1; got != want {
+			t.Fatalf("getCSRFToken() set %d cookies, want %d", got, want)
 		}
 
 		if !cookies[0].Secure {
@@ -112,6 +118,8 @@ func TestGetCSRFToken(t *testing.T) {
 		}
 	})
 }
+
+// validateCSRF
 
 func TestValidateCSRF(t *testing.T) {
 	tests := []struct {
@@ -160,9 +168,11 @@ func TestValidateCSRF(t *testing.T) {
 			}
 
 			target := "/"
+
 			if tt.queryToken != "" {
 				query := url.Values{}
 				query.Set(csrfFormField, tt.queryToken)
+
 				target += "?" + query.Encode()
 			}
 

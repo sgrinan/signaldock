@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+// TLS
+
 func TestTLS(t *testing.T) {
 	t.Run("non_https", func(t *testing.T) {
 		parsedURL := mustParseURL(t, "http://example.com/")
@@ -45,7 +47,11 @@ func TestTLS(t *testing.T) {
 			t.Errorf("TLS(%q, nil) = %+v, want zero TLSResult", parsedURL, got)
 		}
 	})
+}
 
+// tlsProbe
+
+func TestTLSProbe(t *testing.T) {
 	t.Run("valid_certificate", func(t *testing.T) {
 		now := time.Now().UTC()
 
@@ -193,13 +199,19 @@ func TestTLS(t *testing.T) {
 	})
 }
 
+// verifyCertificate
+
 func TestVerifyCertificate(t *testing.T) {
-	err := verifyCertificate(nil, "example.com", nil)
+	const hostname = "example.com"
+
+	err := verifyCertificate(nil, hostname, nil)
 
 	if !errors.Is(err, ErrNoPeerCertificate) {
-		t.Errorf("verifyCertificate(nil, %q, nil) error = %v, want %v", "example.com", err, ErrNoPeerCertificate)
+		t.Errorf("verifyCertificate(nil, %q, nil) error = %v, want %v", hostname, err, ErrNoPeerCertificate)
 	}
 }
+
+// daysBetween
 
 func TestDaysBetween(t *testing.T) {
 	now := time.Date(2026, time.September, 6, 12, 0, 0, 0, time.UTC)
@@ -240,16 +252,7 @@ func TestDaysBetween(t *testing.T) {
 	}
 }
 
-func mustParseURL(t *testing.T, rawURL string) *url.URL {
-	t.Helper()
-
-	parsedURL, err := url.Parse(rawURL)
-	if err != nil {
-		t.Fatalf("url.Parse(%q) returned unexpected error: %v", rawURL, err)
-	}
-
-	return parsedURL
-}
+// TLS test helpers
 
 func newTLSTestServer(t *testing.T, serverName string, notBefore time.Time, notAfter time.Time) (*httptest.Server, *url.URL, []netip.Addr, *x509.CertPool, *x509.Certificate) {
 	t.Helper()

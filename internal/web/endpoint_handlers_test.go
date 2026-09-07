@@ -18,55 +18,7 @@ import (
 	"github.com/sgrinan/signaldock/internal/probe"
 )
 
-type fakeEndpointService struct {
-	addFunc        func(string) (endpoint.Endpoint, error)
-	listFunc       func() []endpoint.Endpoint
-	byIDFunc       func(uuid.UUID) (endpoint.Endpoint, error)
-	removeByIDFunc func(uuid.UUID) error
-	refreshFunc    func(uuid.UUID) (endpoint.CheckResult, error)
-}
-
-var _ endpointService = (*fakeEndpointService)(nil)
-
-func (f *fakeEndpointService) Add(rawURL string) (endpoint.Endpoint, error) {
-	if f.addFunc != nil {
-		return f.addFunc(rawURL)
-	}
-
-	return endpoint.Endpoint{}, nil
-}
-
-func (f *fakeEndpointService) List() []endpoint.Endpoint {
-	if f.listFunc != nil {
-		return f.listFunc()
-	}
-
-	return nil
-}
-
-func (f *fakeEndpointService) ByID(id uuid.UUID) (endpoint.Endpoint, error) {
-	if f.byIDFunc != nil {
-		return f.byIDFunc(id)
-	}
-
-	return endpoint.Endpoint{}, endpoint.ErrEndpointNotFound
-}
-
-func (f *fakeEndpointService) RemoveByID(id uuid.UUID) error {
-	if f.removeByIDFunc != nil {
-		return f.removeByIDFunc(id)
-	}
-
-	return nil
-}
-
-func (f *fakeEndpointService) Refresh(id uuid.UUID) (endpoint.CheckResult, error) {
-	if f.refreshFunc != nil {
-		return f.refreshFunc(id)
-	}
-
-	return endpoint.CheckResult{}, nil
-}
+// handler.handleGetIndex
 
 func TestHandler_HandleGetIndex(t *testing.T) {
 	tests := []struct {
@@ -123,6 +75,7 @@ func TestHandler_HandleGetIndex(t *testing.T) {
 			h := newTestHandler(service)
 
 			target := "/"
+
 			if tt.result != "" {
 				target = "/?result=" + url.QueryEscape(tt.result)
 			}
@@ -132,8 +85,8 @@ func TestHandler_HandleGetIndex(t *testing.T) {
 
 			h.handleGetIndex(recorder, req)
 
-			if recorder.Code != http.StatusOK {
-				t.Errorf("handleGetIndex() status = %d, want %d", recorder.Code, http.StatusOK)
+			if got, want := recorder.Code, http.StatusOK; got != want {
+				t.Errorf("handleGetIndex() status = %d, want %d", got, want)
 			}
 
 			want := tt.want + "|2|csrf"
@@ -145,9 +98,14 @@ func TestHandler_HandleGetIndex(t *testing.T) {
 	}
 }
 
+// handler.handlePostEndpoint
+
 func TestHandler_HandlePostEndpoint(t *testing.T) {
+	const rawURL = "https://example.com"
+
 	httpErr := errors.New("http probe failed")
 	tlsErr := errors.New("tls probe failed")
+	hostErr := errors.New("host check failed")
 
 	added := endpoint.Endpoint{
 		ID:  uuid.NewV7(),
@@ -208,6 +166,14 @@ func TestHandler_HandlePostEndpoint(t *testing.T) {
 			wantLocation: "/?result=unsafe",
 		},
 		{
+			name: "host_check_error",
+			err: endpoint.CheckError{
+				Host: hostErr,
+			},
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: "/?result=unreachable",
+		},
+		{
 			name: "http_check_error",
 			err: endpoint.CheckError{
 				HTTP: httpErr,
@@ -251,6 +217,7 @@ func TestHandler_HandlePostEndpoint(t *testing.T) {
 			service := &fakeEndpointService{
 				addFunc: func(rawURL string) (endpoint.Endpoint, error) {
 					gotRawURL = rawURL
+
 					return added, tt.err
 				},
 			}
@@ -258,7 +225,7 @@ func TestHandler_HandlePostEndpoint(t *testing.T) {
 			h := newTestHandler(service)
 
 			req := newCSRFPostRequest(t, "/endpoints", url.Values{
-				"url": []string{"https://example.com"},
+				"url": []string{rawURL},
 			},
 			)
 
@@ -266,12 +233,12 @@ func TestHandler_HandlePostEndpoint(t *testing.T) {
 
 			h.handlePostEndpoint(recorder, req)
 
-			if gotRawURL != "https://example.com" {
-				t.Errorf("Add() rawURL = %q, want %q", gotRawURL, "https://example.com")
+			if gotRawURL != rawURL {
+				t.Errorf("Add() rawURL = %q, want %q", gotRawURL, rawURL)
 			}
 
-			if recorder.Code != tt.wantStatus {
-				t.Errorf("handlePostEndpoint() status = %d, want %d", recorder.Code, tt.wantStatus)
+			if got := recorder.Code; got != tt.wantStatus {
+				t.Errorf("handlePostEndpoint() status = %d, want %d", got, tt.wantStatus)
 			}
 
 			if got := recorder.Header().Get("Location"); got != tt.wantLocation {
@@ -279,102 +246,94 @@ func TestHandler_HandlePostEndpoint(t *testing.T) {
 			}
 		})
 	}
-}
 
-func TestHandler_HandlePostEndpoint_InvalidCSRF(t *testing.T) {
-	called := false
-
-	service := &fakeEndpointService{
-		addFunc: func(string) (endpoint.Endpoint, error) {
-			called = true
-			return endpoint.Endpoint{}, nil
-		},
-	}
-
-	h := newTestHandler(service)
-
-	req := httptest.NewRequest(http.MethodPost, "/endpoints", strings.NewReader("url=https%3A%2F%2Fexample.com"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	recorder := httptest.NewRecorder()
-
-	h.handlePostEndpoint(recorder, req)
-
-	if recorder.Code != http.StatusForbidden {
-		t.Errorf("handlePostEndpoint() status = %d, want %d", recorder.Code, http.StatusForbidden)
-	}
-
-	if called {
-		t.Error("handlePostEndpoint() called Add() with invalid CSRF token")
-	}
-}
-
-func TestHandler_HandlePostEndpoint_InvalidTLSCertificate(t *testing.T) {
-	httpErr := errors.New("http probe failed")
-	tlsErr := errors.New("certificate validation failed")
-
-	added := endpoint.Endpoint{
-		ID:  uuid.NewV7(),
-		URL: "https://example.com/",
-		LastCheck: endpoint.CheckResult{
-			TLS: probe.TLSResult{
-				Enabled:       true,
-				Valid:         false,
-				ExpiresAt:     time.Now().Add(30 * 24 * time.Hour),
-				DaysRemaining: 30,
+	t.Run("invalid_tls_certificate", func(t *testing.T) {
+		added := endpoint.Endpoint{
+			ID:  uuid.NewV7(),
+			URL: "https://example.com/",
+			LastCheck: endpoint.CheckResult{
+				TLS: probe.TLSResult{
+					Enabled:       true,
+					Valid:         false,
+					ExpiresAt:     time.Now().Add(30 * 24 * time.Hour),
+					DaysRemaining: 30,
+				},
 			},
+		}
+
+		service := &fakeEndpointService{
+			addFunc: func(string) (endpoint.Endpoint, error) {
+				return added, endpoint.CheckError{
+					HTTP: httpErr,
+					TLS:  tlsErr,
+				}
+			},
+		}
+
+		h := newTestHandler(service)
+
+		req := newCSRFPostRequest(t, "/endpoints", url.Values{
+			"url": []string{rawURL},
 		},
-	}
+		)
 
-	service := &fakeEndpointService{
-		addFunc: func(string) (endpoint.Endpoint, error) {
-			return added, endpoint.CheckError{
-				HTTP: httpErr,
-				TLS:  tlsErr,
-			}
-		},
-	}
+		recorder := httptest.NewRecorder()
 
-	h := newTestHandler(service)
+		h.handlePostEndpoint(recorder, req)
 
-	req := newCSRFPostRequest(t, "/endpoints", url.Values{
-		"url": []string{"https://example.com"},
+		if got, want := recorder.Code, http.StatusSeeOther; got != want {
+			t.Errorf("handlePostEndpoint() status = %d, want %d", got, want)
+		}
+
+		if got, want := recorder.Header().Get("Location"), "/?result=tls-invalid"; got != want {
+			t.Errorf("handlePostEndpoint() Location = %q, want %q", got, want)
+		}
 	})
 
-	recorder := httptest.NewRecorder()
+	t.Run("invalid_csrf", func(t *testing.T) {
+		called := false
 
-	h.handlePostEndpoint(recorder, req)
+		service := &fakeEndpointService{
+			addFunc: func(string) (endpoint.Endpoint, error) {
+				called = true
 
-	if recorder.Code != http.StatusSeeOther {
-		t.Errorf("handlePostEndpoint() status = %d, want %d", recorder.Code, http.StatusSeeOther)
-	}
+				return endpoint.Endpoint{}, nil
+			},
+		}
 
-	if got := recorder.Header().Get("Location"); got != "/?result=tls-invalid" {
-		t.Errorf("handlePostEndpoint() Location = %q, want %q", got, "/?result=tls-invalid")
-	}
+		h := newTestHandler(service)
+
+		req := httptest.NewRequest(http.MethodPost, "/endpoints", strings.NewReader("url=https%3A%2F%2Fexample.com"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		recorder := httptest.NewRecorder()
+
+		h.handlePostEndpoint(recorder, req)
+
+		if got, want := recorder.Code, http.StatusForbidden; got != want {
+			t.Errorf("handlePostEndpoint() status = %d, want %d", got, want)
+		}
+
+		if called {
+			t.Error("handlePostEndpoint() called Add() with invalid CSRF token")
+		}
+	})
 }
+
+// handler.handleGetEndpoint
 
 func TestHandler_HandleGetEndpoint(t *testing.T) {
 	id := uuid.NewV7()
 
-	ep := endpoint.Endpoint{
+	checkedEndpoint := endpoint.Endpoint{
 		ID:  id,
 		URL: "https://example.com/",
 		LastCheck: endpoint.CheckResult{
 			HTTP: probe.HTTPResult{
-				StatusCode: 200,
+				StatusCode: http.StatusOK,
 				Latency:    123 * time.Millisecond,
 				Responded:  true,
-				CheckedAt: time.Date(
-					2026,
-					time.September,
-					6,
-					15,
-					4,
-					5,
-					0,
-					time.UTC,
-				),
+				CheckedAt:  time.Date(2026, time.September, 6, 15, 4, 5, 0, time.UTC),
 			},
 			TLS: probe.TLSResult{
 				Enabled:       true,
@@ -385,148 +344,116 @@ func TestHandler_HandleGetEndpoint(t *testing.T) {
 		},
 	}
 
-	service := &fakeEndpointService{
-		byIDFunc: func(gotID uuid.UUID) (endpoint.Endpoint, error) {
-			if gotID != id {
-				t.Errorf("ByID() id = %v, want %v", gotID, id)
-			}
-
-			return ep, nil
-		},
-	}
-
-	h := newTestHandler(service)
-
-	req := httptest.NewRequest(http.MethodGet, "/endpoints/"+id.String(), nil)
-	req.SetPathValue("id", id.String())
-
-	recorder := httptest.NewRecorder()
-
-	h.handleGetEndpoint(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("handleGetEndpoint() status = %d, want %d", recorder.Code, http.StatusOK)
-	}
-
-	want := "https://example.com/|123|15:04:05|01 Oct 2026|Responding|status-ok|status-warning|false|csrf"
-
-	if got := recorder.Body.String(); got != want {
-		t.Errorf("handleGetEndpoint() body = %q, want %q", got, want)
-	}
-}
-
-func TestHandler_HandleGetEndpoint_Error(t *testing.T) {
-	t.Run("invalid_id", func(t *testing.T) {
-		h := newTestHandler(&fakeEndpointService{})
-
-		req := httptest.NewRequest(http.MethodGet, "/endpoints/invalid", nil)
-		req.SetPathValue("id", "invalid")
-
-		recorder := httptest.NewRecorder()
-
-		h.handleGetEndpoint(recorder, req)
-
-		if recorder.Code != http.StatusBadRequest {
-			t.Errorf("handleGetEndpoint() status = %d, want %d", recorder.Code, http.StatusBadRequest)
-		}
-	})
-
-	t.Run("not_found", func(t *testing.T) {
-		id := uuid.NewV7()
-
-		service := &fakeEndpointService{
-			byIDFunc: func(uuid.UUID) (endpoint.Endpoint, error) {
-				return endpoint.Endpoint{}, endpoint.ErrEndpointNotFound
-			},
-		}
-
-		h := newTestHandler(service)
-
-		req := httptest.NewRequest(http.MethodGet, "/endpoints/"+id.String(), nil)
-		req.SetPathValue("id", id.String())
-
-		recorder := httptest.NewRecorder()
-
-		h.handleGetEndpoint(recorder, req)
-
-		if recorder.Code != http.StatusNotFound {
-			t.Errorf("handleGetEndpoint() status = %d, want %d", recorder.Code, http.StatusNotFound)
-		}
-	})
-
-	t.Run("unexpected_error", func(t *testing.T) {
-		id := uuid.NewV7()
-
-		service := &fakeEndpointService{
-			byIDFunc: func(uuid.UUID) (endpoint.Endpoint, error) {
-				return endpoint.Endpoint{}, errors.New("unexpected error")
-			},
-		}
-
-		h := newTestHandler(service)
-
-		req := httptest.NewRequest(http.MethodGet, "/endpoints/"+id.String(), nil)
-		req.SetPathValue("id", id.String())
-
-		recorder := httptest.NewRecorder()
-
-		h.handleGetEndpoint(recorder, req)
-
-		if recorder.Code != http.StatusInternalServerError {
-			t.Errorf("handleGetEndpoint() status = %d, want %d", recorder.Code, http.StatusInternalServerError)
-		}
-	})
-}
-
-func TestHandler_HandleGetEndpoint_Checking(t *testing.T) {
-	id := uuid.NewV7()
-
-	ep := endpoint.Endpoint{
+	checkingEndpoint := endpoint.Endpoint{
 		ID:  id,
 		URL: "https://example.com/",
 	}
 
-	service := &fakeEndpointService{
-		byIDFunc: func(uuid.UUID) (endpoint.Endpoint, error) {
-			return ep, nil
+	tests := []struct {
+		name       string
+		pathID     string
+		ep         endpoint.Endpoint
+		serviceErr error
+		wantStatus int
+		wantBody   string
+		wantByID   bool
+	}{
+		{
+			name:       "success",
+			pathID:     id.String(),
+			ep:         checkedEndpoint,
+			wantStatus: http.StatusOK,
+			wantBody:   "https://example.com/|123|15:04:05|01 Oct 2026|Responding|status-ok|status-warning|false|csrf",
+			wantByID:   true,
+		},
+		{
+			name:       "checking",
+			pathID:     id.String(),
+			ep:         checkingEndpoint,
+			wantStatus: http.StatusOK,
+			wantBody:   "https://example.com/|0|||Checking|status-pending||true|csrf",
+			wantByID:   true,
+		},
+		{
+			name:       "invalid_id",
+			pathID:     "invalid",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "not_found",
+			pathID:     id.String(),
+			serviceErr: endpoint.ErrEndpointNotFound,
+			wantStatus: http.StatusNotFound,
+			wantByID:   true,
+		},
+		{
+			name:       "unexpected_error",
+			pathID:     id.String(),
+			serviceErr: errors.New("unexpected error"),
+			wantStatus: http.StatusInternalServerError,
+			wantByID:   true,
 		},
 	}
 
-	h := newTestHandler(service)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
 
-	req := httptest.NewRequest(http.MethodGet, "/endpoints/"+id.String(), nil)
-	req.SetPathValue("id", id.String())
+			service := &fakeEndpointService{
+				byIDFunc: func(gotID uuid.UUID) (endpoint.Endpoint, error) {
+					called = true
 
-	recorder := httptest.NewRecorder()
+					if gotID != id {
+						t.Errorf("ByID() id = %v, want %v", gotID, id)
+					}
 
-	h.handleGetEndpoint(recorder, req)
+					return tt.ep, tt.serviceErr
+				},
+			}
 
-	if recorder.Code != http.StatusOK {
-		t.Errorf("handleGetEndpoint() status = %d, want %d", recorder.Code, http.StatusOK)
-	}
+			h := newTestHandler(service)
 
-	want := "https://example.com/|0|||Checking|status-pending||true|csrf"
+			req := httptest.NewRequest(http.MethodGet, "/endpoints/"+tt.pathID, nil)
+			req.SetPathValue("id", tt.pathID)
 
-	if got := recorder.Body.String(); got != want {
-		t.Errorf("handleGetEndpoint() body = %q, want %q", got, want)
+			recorder := httptest.NewRecorder()
+
+			h.handleGetEndpoint(recorder, req)
+
+			if got := recorder.Code; got != tt.wantStatus {
+				t.Errorf("handleGetEndpoint() status = %d, want %d", got, tt.wantStatus)
+			}
+
+			if called != tt.wantByID {
+				t.Errorf("handleGetEndpoint() called ByID() = %t, want %t", called, tt.wantByID)
+			}
+
+			if tt.wantBody != "" {
+				if got := recorder.Body.String(); got != tt.wantBody {
+					t.Errorf("handleGetEndpoint() body = %q, want %q", got, tt.wantBody)
+				}
+			}
+		})
 	}
 }
+
+// handler.handleDeleteEndpoint
 
 func TestHandler_HandleDeleteEndpoint(t *testing.T) {
 	id := uuid.NewV7()
 
 	tests := []struct {
-		name       string
-		id         string
-		removeErr  error
-		wantStatus int
-		want       string
+		name         string
+		id           string
+		removeErr    error
+		wantStatus   int
+		wantLocation string
 	}{
 		{
-			name:       "success",
-			id:         id.String(),
-			wantStatus: http.StatusSeeOther,
-			want:       "/",
+			name:         "success",
+			id:           id.String(),
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: "/",
 		},
 		{
 			name:       "invalid_id",
@@ -564,44 +491,47 @@ func TestHandler_HandleDeleteEndpoint(t *testing.T) {
 
 			h.handleDeleteEndpoint(recorder, req)
 
-			if recorder.Code != tt.wantStatus {
-				t.Errorf("handleDeleteEndpoint() status = %d, want %d", recorder.Code, tt.wantStatus)
+			if got := recorder.Code; got != tt.wantStatus {
+				t.Errorf("handleDeleteEndpoint() status = %d, want %d", got, tt.wantStatus)
 			}
 
-			if got := recorder.Header().Get("Location"); got != tt.want {
-				t.Errorf("handleDeleteEndpoint() Location = %q, want %q", got, tt.want)
+			if got := recorder.Header().Get("Location"); got != tt.wantLocation {
+				t.Errorf("handleDeleteEndpoint() Location = %q, want %q", got, tt.wantLocation)
 			}
 		})
 	}
+
+	t.Run("invalid_csrf", func(t *testing.T) {
+		called := false
+
+		service := &fakeEndpointService{
+			removeByIDFunc: func(uuid.UUID) error {
+				called = true
+
+				return nil
+			},
+		}
+
+		h := newTestHandler(service)
+
+		req := httptest.NewRequest(http.MethodPost, "/endpoints/id/delete", nil)
+		req.SetPathValue("id", uuid.NewV7().String())
+
+		recorder := httptest.NewRecorder()
+
+		h.handleDeleteEndpoint(recorder, req)
+
+		if got, want := recorder.Code, http.StatusForbidden; got != want {
+			t.Errorf("handleDeleteEndpoint() status = %d, want %d", got, want)
+		}
+
+		if called {
+			t.Error("handleDeleteEndpoint() called RemoveByID() with invalid CSRF token")
+		}
+	})
 }
 
-func TestHandler_HandleDeleteEndpoint_InvalidCSRF(t *testing.T) {
-	called := false
-
-	service := &fakeEndpointService{
-		removeByIDFunc: func(uuid.UUID) error {
-			called = true
-			return nil
-		},
-	}
-
-	h := newTestHandler(service)
-
-	req := httptest.NewRequest(http.MethodPost, "/endpoints/id/delete", nil)
-	req.SetPathValue("id", uuid.NewV7().String())
-
-	recorder := httptest.NewRecorder()
-
-	h.handleDeleteEndpoint(recorder, req)
-
-	if recorder.Code != http.StatusForbidden {
-		t.Errorf("handleDeleteEndpoint() status = %d, want %d", recorder.Code, http.StatusForbidden)
-	}
-
-	if called {
-		t.Error("handleDeleteEndpoint() called RemoveByID() with invalid CSRF token")
-	}
-}
+// handler.handleRefreshEndpoint
 
 func TestHandler_HandleRefreshEndpoint(t *testing.T) {
 	id := uuid.NewV7()
@@ -611,24 +541,24 @@ func TestHandler_HandleRefreshEndpoint(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		id         string
-		refreshErr error
-		wantStatus int
-		want       string
+		name         string
+		id           string
+		refreshErr   error
+		wantStatus   int
+		wantLocation string
 	}{
 		{
-			name:       "success",
-			id:         id.String(),
-			wantStatus: http.StatusSeeOther,
-			want:       "/endpoints/" + id.String(),
+			name:         "success",
+			id:           id.String(),
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: "/endpoints/" + id.String(),
 		},
 		{
-			name:       "check_error",
-			id:         id.String(),
-			refreshErr: checkErr,
-			wantStatus: http.StatusSeeOther,
-			want:       "/endpoints/" + id.String(),
+			name:         "check_error",
+			id:           id.String(),
+			refreshErr:   checkErr,
+			wantStatus:   http.StatusSeeOther,
+			wantLocation: "/endpoints/" + id.String(),
 		},
 		{
 			name:       "invalid_id",
@@ -666,44 +596,99 @@ func TestHandler_HandleRefreshEndpoint(t *testing.T) {
 
 			h.handleRefreshEndpoint(recorder, req)
 
-			if recorder.Code != tt.wantStatus {
-				t.Errorf("handleRefreshEndpoint() status = %d, want %d", recorder.Code, tt.wantStatus)
+			if got := recorder.Code; got != tt.wantStatus {
+				t.Errorf("handleRefreshEndpoint() status = %d, want %d", got, tt.wantStatus)
 			}
 
-			if got := recorder.Header().Get("Location"); got != tt.want {
-				t.Errorf("handleRefreshEndpoint() Location = %q, want %q", got, tt.want)
+			if got := recorder.Header().Get("Location"); got != tt.wantLocation {
+				t.Errorf("handleRefreshEndpoint() Location = %q, want %q", got, tt.wantLocation)
 			}
 		})
 	}
+
+	t.Run("invalid_csrf", func(t *testing.T) {
+		called := false
+
+		service := &fakeEndpointService{
+			refreshFunc: func(uuid.UUID) (endpoint.CheckResult, error) {
+				called = true
+
+				return endpoint.CheckResult{}, nil
+			},
+		}
+
+		h := newTestHandler(service)
+
+		req := httptest.NewRequest(http.MethodPost, "/endpoints/id/refresh", nil)
+		req.SetPathValue("id", uuid.NewV7().String())
+
+		recorder := httptest.NewRecorder()
+
+		h.handleRefreshEndpoint(recorder, req)
+
+		if got, want := recorder.Code, http.StatusForbidden; got != want {
+			t.Errorf("handleRefreshEndpoint() status = %d, want %d", got, want)
+		}
+
+		if called {
+			t.Error("handleRefreshEndpoint() called Refresh() with invalid CSRF token")
+		}
+	})
 }
 
-func TestHandler_HandleRefreshEndpoint_InvalidCSRF(t *testing.T) {
-	called := false
+// Test doubles
 
-	service := &fakeEndpointService{
-		refreshFunc: func(uuid.UUID) (endpoint.CheckResult, error) {
-			called = true
-			return endpoint.CheckResult{}, nil
-		},
-	}
-
-	h := newTestHandler(service)
-
-	req := httptest.NewRequest(http.MethodPost, "/endpoints/id/refresh", nil)
-	req.SetPathValue("id", uuid.NewV7().String())
-
-	recorder := httptest.NewRecorder()
-
-	h.handleRefreshEndpoint(recorder, req)
-
-	if recorder.Code != http.StatusForbidden {
-		t.Errorf("handleRefreshEndpoint() status = %d, want %d", recorder.Code, http.StatusForbidden)
-	}
-
-	if called {
-		t.Error("handleRefreshEndpoint() called Refresh() with invalid CSRF token")
-	}
+type fakeEndpointService struct {
+	addFunc        func(string) (endpoint.Endpoint, error)
+	listFunc       func() []endpoint.Endpoint
+	byIDFunc       func(uuid.UUID) (endpoint.Endpoint, error)
+	removeByIDFunc func(uuid.UUID) error
+	refreshFunc    func(uuid.UUID) (endpoint.CheckResult, error)
 }
+
+var _ endpointService = (*fakeEndpointService)(nil)
+
+func (f *fakeEndpointService) Add(rawURL string) (endpoint.Endpoint, error) {
+	if f.addFunc != nil {
+		return f.addFunc(rawURL)
+	}
+
+	return endpoint.Endpoint{}, nil
+}
+
+func (f *fakeEndpointService) List() []endpoint.Endpoint {
+	if f.listFunc != nil {
+		return f.listFunc()
+	}
+
+	return nil
+}
+
+func (f *fakeEndpointService) ByID(id uuid.UUID) (endpoint.Endpoint, error) {
+	if f.byIDFunc != nil {
+		return f.byIDFunc(id)
+	}
+
+	return endpoint.Endpoint{}, endpoint.ErrEndpointNotFound
+}
+
+func (f *fakeEndpointService) RemoveByID(id uuid.UUID) error {
+	if f.removeByIDFunc != nil {
+		return f.removeByIDFunc(id)
+	}
+
+	return nil
+}
+
+func (f *fakeEndpointService) Refresh(id uuid.UUID) (endpoint.CheckResult, error) {
+	if f.refreshFunc != nil {
+		return f.refreshFunc(id)
+	}
+
+	return endpoint.CheckResult{}, nil
+}
+
+// Test helpers
 
 func newTestHandler(service endpointService) *handler {
 	tmpl := template.Must(
@@ -721,9 +706,7 @@ func newTestHandler(service endpointService) *handler {
 	return &handler{
 		endpoints: service,
 		templates: tmpl,
-		logger: slog.New(
-			slog.NewTextHandler(io.Discard, nil),
-		),
+		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 }
 
