@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"log/slog"
 	"net/http"
 	"os"
@@ -20,6 +21,14 @@ const (
 )
 
 func main() {
+	showVersion := flag.Bool("version", false, "print version information")
+	flag.Parse()
+
+	if *showVersion {
+		printVersion()
+		return
+	}
+
 	port := os.Getenv("SIGNALDOCK_PORT")
 	if port == "" {
 		port = defaultPort
