@@ -1,27 +1,179 @@
-<h1>SignalDock</h1>
+<!DOCTYPE html>
+<html lang="en">
 
-<form method="POST" action="/endpoints">
-    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-    <label for="url">Endpoint URL</label>
-    <input type="url" id="url" name="url" placeholder="https://example.com" required>
-    <button type="submit">Add</button>
-</form>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-{{ if .Error }}
-    <p>{{ .Error }}</p>
-{{ end }}
+    <title>SignalDock</title>
 
-<h2>Endpoints</h2>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
 
-{{ range .Endpoints }}
-    <div>
-        <span>{{ .URL }}</span>
+<body>
 
-        <a href="/endpoints/{{ .ID }}">View</a>
+    <!-- Header -->
 
-        <form method="POST" action="/endpoints/{{ .ID }}/delete">
-            <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
-            <button type="submit">Remove</button>
-        </form>
-    </div>
-{{ end }}
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="/">SignalDock</a>
+            <span class="header-label">Endpoint monitoring</span>
+        </div>
+    </header>
+
+
+    <!-- Main content -->
+
+    <main class="container">
+
+
+        <!-- Add endpoint -->
+
+        <section class="add-endpoint">
+            <div class="section-heading">
+                <div>
+                    <h1>Endpoints</h1>
+                    <p>Monitor HTTP availability, latency and TLS certificates.</p>
+                </div>
+            </div>
+
+            <form class="add-form" method="POST" action="/endpoints">
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ .CSRFToken }}"
+                >
+
+                <div class="form-field">
+                    <label for="url">Endpoint URL</label>
+
+                    <div class="form-row">
+                        <input
+                            type="url"
+                            id="url"
+                            name="url"
+                            placeholder="https://www.example.com"
+                            required
+                        >
+
+                        <button type="submit">
+                            Add endpoint
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+
+            <!-- Alert -->
+
+            {{ if .Error }}
+                <div class="alert" role="alert">
+                    <span>{{ .Error }}</span>
+
+                    <a
+                        class="alert-close"
+                        href="/"
+                        aria-label="Dismiss notification"
+                    >
+                        &times;
+                    </a>
+                </div>
+            {{ end }}
+        </section>
+
+
+        <!-- Endpoint list -->
+
+        <section class="endpoint-list">
+            <div class="section-heading">
+                <h2>Monitored endpoints</h2>
+
+                <span class="endpoint-count">
+                    {{ len .Endpoints }}
+                </span>
+            </div>
+
+
+            <!-- Endpoint cards -->
+
+            {{ if .Endpoints }}
+
+                <div class="endpoint-grid">
+
+                    {{ range .Endpoints }}
+
+                        <article class="endpoint-card">
+
+                            <!-- Card header -->
+
+                            <div class="endpoint-card-header">
+                                <a
+                                    class="endpoint-url"
+                                    href="/endpoints/{{ .ID }}"
+                                >
+                                    {{ .URL }}
+                                </a>
+
+                                <span class="status-badge {{ .StateClass }}">
+                                    {{ .State }}
+                                </span>
+                            </div>
+
+
+                            <!-- Endpoint summary -->
+
+                            <div class="endpoint-summary">
+
+                                <span class="summary-item">
+                                    <span class="summary-label">HTTP</span>
+                                    <strong>{{ .HTTPStatus }}</strong>
+                                </span>
+
+                                <span class="summary-item">
+                                    <span class="summary-label">Latency</span>
+                                    <strong>{{ .Latency }}</strong>
+                                </span>
+
+                                <span class="summary-item">
+                                    <span class="summary-label">TLS</span>
+                                    <strong>{{ .TLSState }}</strong>
+                                </span>
+
+                                <span class="summary-item">
+                                    <span class="summary-label">Last checked</span>
+                                    <strong>{{ .LastCheckedAt }}</strong>
+                                </span>
+
+                                <a
+                                    class="button button-secondary"
+                                    href="/endpoints/{{ .ID }}"
+                                >
+                                    View
+                                </a>
+                            </div>
+
+                        </article>
+
+                    {{ end }}
+
+                </div>
+
+
+            <!-- Empty state -->
+
+            {{ else }}
+
+                <div class="empty-state">
+                    <h3>No endpoints yet</h3>
+                    <p>Add your first endpoint to start monitoring it.</p>
+                </div>
+
+            {{ end }}
+
+        </section>
+
+    </main>
+
+</body>
+
+</html>

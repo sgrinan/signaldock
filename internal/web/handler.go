@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log/slog"
 	"net/http"
 
@@ -12,8 +13,8 @@ import (
 	"github.com/sgrinan/signaldock/internal/endpoint"
 )
 
-//go:embed templates/*.html
-var templates embed.FS
+//go:embed templates/*.html static/*
+var assets embed.FS
 
 type endpointService interface {
 	Add(string) (endpoint.Endpoint, error)
@@ -31,9 +32,14 @@ type handler struct {
 
 // NewHandler returns the HTTP handler for the SignalDock web interface.
 func NewHandler(service endpointService, logger *slog.Logger) (http.Handler, error) {
-	tmpl, err := template.ParseFS(templates, "templates/*.html")
+	tmpl, err := template.ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
+	}
+
+	staticFS, err := fs.Sub(assets, "static")
+	if err != nil {
+		return nil, fmt.Errorf("create static filesystem: %w", err)
 	}
 
 	h := &handler{
@@ -43,6 +49,8 @@ func NewHandler(service endpointService, logger *slog.Logger) (http.Handler, err
 	}
 
 	mux := http.NewServeMux()
+
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	mux.HandleFunc("GET /{$}", h.handleGetIndex)
 	mux.HandleFunc("POST /endpoints", h.handlePostEndpoint)

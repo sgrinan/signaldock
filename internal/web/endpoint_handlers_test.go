@@ -360,11 +360,30 @@ func TestHandler_HandleGetEndpoint(t *testing.T) {
 	ep := endpoint.Endpoint{
 		ID:  id,
 		URL: "https://example.com/",
+		LastCheck: endpoint.CheckResult{
+			HTTP: probe.HTTPResult{
+				StatusCode: 200,
+				Latency:    123 * time.Millisecond,
+				Responded:  true,
+				CheckedAt: time.Date(
+					2026,
+					time.September,
+					6,
+					15,
+					4,
+					5,
+					0,
+					time.UTC,
+				),
+			},
+			TLS: probe.TLSResult{
+				Enabled:       true,
+				Valid:         true,
+				ExpiresAt:     time.Date(2026, time.October, 1, 0, 0, 0, 0, time.UTC),
+				DaysRemaining: 25,
+			},
+		},
 	}
-
-	ep.LastCheck.HTTP.Latency = 123 * time.Millisecond
-	ep.LastCheck.HTTP.CheckedAt = time.Date(2026, time.September, 6, 15, 4, 5, 0, time.UTC)
-	ep.LastCheck.TLS.ExpiresAt = time.Date(2026, time.October, 1, 0, 0, 0, 0, time.UTC)
 
 	service := &fakeEndpointService{
 		byIDFunc: func(gotID uuid.UUID) (endpoint.Endpoint, error) {
@@ -389,7 +408,7 @@ func TestHandler_HandleGetEndpoint(t *testing.T) {
 		t.Errorf("handleGetEndpoint() status = %d, want %d", recorder.Code, http.StatusOK)
 	}
 
-	want := "https://example.com/|123|15:04:05|01 Oct 2026|csrf"
+	want := "https://example.com/|123|15:04:05|01 Oct 2026|Responding|status-ok|status-warning|false|csrf"
 
 	if got := recorder.Body.String(); got != want {
 		t.Errorf("handleGetEndpoint() body = %q, want %q", got, want)
@@ -457,6 +476,40 @@ func TestHandler_HandleGetEndpoint_Error(t *testing.T) {
 			t.Errorf("handleGetEndpoint() status = %d, want %d", recorder.Code, http.StatusInternalServerError)
 		}
 	})
+}
+
+func TestHandler_HandleGetEndpoint_Checking(t *testing.T) {
+	id := uuid.NewV7()
+
+	ep := endpoint.Endpoint{
+		ID:  id,
+		URL: "https://example.com/",
+	}
+
+	service := &fakeEndpointService{
+		byIDFunc: func(uuid.UUID) (endpoint.Endpoint, error) {
+			return ep, nil
+		},
+	}
+
+	h := newTestHandler(service)
+
+	req := httptest.NewRequest(http.MethodGet, "/endpoints/"+id.String(), nil)
+	req.SetPathValue("id", id.String())
+
+	recorder := httptest.NewRecorder()
+
+	h.handleGetEndpoint(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("handleGetEndpoint() status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+
+	want := "https://example.com/|0|||Checking|status-pending||true|csrf"
+
+	if got := recorder.Body.String(); got != want {
+		t.Errorf("handleGetEndpoint() body = %q, want %q", got, want)
+	}
 }
 
 func TestHandler_HandleDeleteEndpoint(t *testing.T) {
@@ -661,7 +714,7 @@ func newTestHandler(service endpointService) *handler {
 
 	template.Must(
 		tmpl.New("endpoint.html").Parse(
-			`{{.Endpoint.URL}}|{{.LatencyMS}}|{{.LastCheckedAt}}|{{.TLSExpiresAt}}|{{if .CSRFToken}}csrf{{end}}`,
+			`{{.Endpoint.URL}}|{{.LatencyMS}}|{{.LastCheckedAt}}|{{.TLSExpiresAt}}|{{.State}}|{{.StateClass}}|{{.TLSDaysClass}}|{{.Checking}}|{{if .CSRFToken}}csrf{{end}}`,
 		),
 	)
 

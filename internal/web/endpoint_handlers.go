@@ -20,8 +20,10 @@ func (h *handler) handleGetIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	endpoints := h.endpoints.List()
+
 	data := pageData{
-		Endpoints: h.endpoints.List(),
+		Endpoints: newEndpointListItems(endpoints),
 		CSRFToken: csrfToken,
 	}
 
@@ -156,10 +158,15 @@ func (h *handler) handleGetEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Reuse the same endpoint state shown on the dashboard.
+	item := newEndpointListItem(ep)
+
 	tlsExpiresAt := ""
+	tlsDaysClass := ""
 
 	if !ep.LastCheck.TLS.ExpiresAt.IsZero() {
 		tlsExpiresAt = ep.LastCheck.TLS.ExpiresAt.Format("02 Jan 2006")
+		tlsDaysClass = tlsExpiryClass(ep.LastCheck.TLS.DaysRemaining)
 	}
 
 	lastCheckedAt := ""
@@ -174,6 +181,10 @@ func (h *handler) handleGetEndpoint(w http.ResponseWriter, r *http.Request) {
 		LatencyMS:     ep.LastCheck.HTTP.Latency.Milliseconds(),
 		LastCheckedAt: lastCheckedAt,
 		TLSExpiresAt:  tlsExpiresAt,
+		State:         item.State,
+		StateClass:    item.StateClass,
+		TLSDaysClass:  tlsDaysClass,
+		Checking:      ep.LastCheck.HTTP.CheckedAt.IsZero(),
 	}
 
 	h.render(w, "endpoint.html", data)
