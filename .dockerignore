@@ -1,0 +1,13 @@
+# Git
+.git
+.gitignore
+
+# Build output
+bin/
+
+# Project metadata
+Dockerfile
+.dockerignore
+Makefile
+README.md
+LICENSE
