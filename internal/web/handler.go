@@ -58,5 +58,7 @@ func NewHandler(service endpointService, logger *slog.Logger) (http.Handler, err
 	mux.HandleFunc("POST /endpoints/{id}/delete", h.handleDeleteEndpoint)
 	mux.HandleFunc("POST /endpoints/{id}/refresh", h.handleRefreshEndpoint)
 
+	mux.HandleFunc("GET /api/prometheus/targets", h.handlePrometheusTargets)
+
 	return securityHeaders(mux), nil
 }

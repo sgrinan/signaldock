@@ -7,7 +7,7 @@ COMMIT ?= $(shell git rev-parse --short HEAD)
 
 LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 
-.PHONY: build run test check clean docker-build docker-run
+.PHONY: build run test check clean docker-build docker-run up down
 
 build:
 	mkdir -p bin
@@ -28,13 +28,13 @@ clean:
 	rm -rf bin
 
 docker-build:
-	docker build \
-		--build-arg VERSION="$(VERSION)" \
-		--build-arg COMMIT="$(COMMIT)" \
-		-t "$(IMAGE):$(VERSION)" \
-		.
+	docker build --build-arg VERSION="$(VERSION)" --build-arg COMMIT="$(COMMIT)" -t "$(IMAGE):$(VERSION)" .
 
 docker-run:
-	docker run --rm \
-		-p 8080:8080 \
-		"$(IMAGE):$(VERSION)"
+	docker run --rm -p 8080:8080 "$(IMAGE):$(VERSION)"
+
+up:
+	docker compose up -d --build
+
+down:
+	docker compose down

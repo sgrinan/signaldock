@@ -1,0 +1,32 @@
+services:
+  signaldock:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: signaldock:dev
+    ports:
+      - "8080:8080"
+
+  blackbox:
+    image: quay.io/prometheus/blackbox-exporter:v0.28.0
+    command:
+      - --config.file=/config/blackbox.yml
+    volumes:
+      - ./config/blackbox/blackbox.yml:/config/blackbox.yml:ro
+    ports:
+      - "9115:9115"
+
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - blackbox
+
+volumes:
+  prometheus-data:
