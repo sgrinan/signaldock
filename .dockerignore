@@ -5,6 +5,19 @@
 # Build output
 bin/
 
+# Local environment and secrets
+.env
+.env.*
+secrets/
+
+# Deployment
+compose.yaml
+compose.test.yaml
+config/
+
+# Tests
+**/*_test.go
+
 # Project metadata
 Dockerfile
 .dockerignore

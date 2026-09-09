@@ -16,8 +16,10 @@ coverage.*
 go.work
 go.work.sum
 
-# Environment
+# Local environment and secrets
 .env
+.env.*
+secrets/
 
 # Editor
 .vscode/
