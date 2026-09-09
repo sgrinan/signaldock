@@ -175,17 +175,11 @@ func (h *handler) handleGetEndpoint(w http.ResponseWriter, r *http.Request) {
 		tlsDaysClass = tlsExpiryClass(ep.LastCheck.TLS.DaysRemaining)
 	}
 
-	lastCheckedAt := ""
-
-	if !ep.LastCheck.HTTP.CheckedAt.IsZero() {
-		lastCheckedAt = ep.LastCheck.HTTP.CheckedAt.Format("15:04:05")
-	}
-
 	data := endpointPageData{
 		Endpoint:      ep,
 		CSRFToken:     csrfToken,
 		LatencyMS:     ep.LastCheck.HTTP.Latency.Milliseconds(),
-		LastCheckedAt: lastCheckedAt,
+		LastCheckedAt: ep.LastCheck.HTTP.CheckedAt,
 		TLSExpiresAt:  tlsExpiresAt,
 		State:         item.State,
 		StateClass:    item.StateClass,

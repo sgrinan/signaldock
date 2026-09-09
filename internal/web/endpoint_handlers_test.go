@@ -699,7 +699,7 @@ func newTestHandler(service endpointService) *handler {
 
 	template.Must(
 		tmpl.New("endpoint.html").Parse(
-			`{{.Endpoint.URL}}|{{.LatencyMS}}|{{.LastCheckedAt}}|{{.TLSExpiresAt}}|{{.State}}|{{.StateClass}}|{{.TLSDaysClass}}|{{.Checking}}|{{if .CSRFToken}}csrf{{end}}`,
+			`{{.Endpoint.URL}}|{{.LatencyMS}}|{{if not .LastCheckedAt.IsZero}}{{.LastCheckedAt.Format "15:04:05"}}{{end}}|{{.TLSExpiresAt}}|{{.State}}|{{.StateClass}}|{{.TLSDaysClass}}|{{.Checking}}|{{if .CSRFToken}}csrf{{end}}`,
 		),
 	)
 

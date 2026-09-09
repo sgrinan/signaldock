@@ -18,6 +18,7 @@
         <div class="container">
             <a class="brand" href="/">SignalDock</a>
             <span class="header-label">Endpoint monitoring</span>
+            <script src="/static/time.js" defer></script>
         </div>
     </header>
 
@@ -141,7 +142,18 @@
 
                                 <span class="summary-item">
                                     <span class="summary-label">Last checked</span>
-                                    <strong>{{ .LastCheckedAt }}</strong>
+                                    {{ if .LastCheckedAt.IsZero }}
+                                        <strong>Not checked yet</strong>
+                                    {{ else }}
+                                        <strong>
+                                            <time
+                                                data-local-time
+                                                datetime="{{ .LastCheckedAt.Format "2006-01-02T15:04:05Z07:00" }}"
+                                            >
+                                                {{ .LastCheckedAt.Format "15:04:05" }}
+                                            </time>
+                                        </strong>
+                                    {{ end }}
                                 </span>
 
                                 <a

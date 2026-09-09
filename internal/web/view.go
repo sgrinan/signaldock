@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"uuid"
 
@@ -17,7 +18,7 @@ type endpointListItem struct {
 	HTTPStatus       string
 	HTTPState        string
 	Latency          string
-	LastCheckedAt    string
+	LastCheckedAt    time.Time
 	TLSState         string
 	TLSDaysRemaining string
 }
@@ -32,7 +33,7 @@ type endpointPageData struct {
 	Endpoint      endpoint.Endpoint
 	CSRFToken     string
 	LatencyMS     int64
-	LastCheckedAt string
+	LastCheckedAt time.Time
 	TLSExpiresAt  string
 	State         string
 	StateClass    string
@@ -49,7 +50,6 @@ func newEndpointListItem(ep endpoint.Endpoint) endpointListItem {
 		HTTPStatus:       "—",
 		HTTPState:        "Checking",
 		Latency:          "—",
-		LastCheckedAt:    "Not checked yet",
 		TLSState:         "Checking",
 		TLSDaysRemaining: "",
 	}
@@ -59,7 +59,7 @@ func newEndpointListItem(ep endpoint.Endpoint) endpointListItem {
 		return item
 	}
 
-	item.LastCheckedAt = ep.LastCheck.HTTP.CheckedAt.Format("15:04:05")
+	item.LastCheckedAt = ep.LastCheck.HTTP.CheckedAt
 	item.Latency = fmt.Sprintf("%d ms", ep.LastCheck.HTTP.Latency.Milliseconds())
 
 	if ep.LastCheck.HTTP.Responded {
