@@ -7,6 +7,9 @@ COMMIT ?= $(shell git rev-parse --short HEAD)
 
 LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 
+TEST_COMPOSE := docker compose -f compose.test.yaml
+TEST_DATABASE_URL := postgres://signaldock:test@localhost:5433/signaldock_test?sslmode=disable
+
 .PHONY: build run test check clean docker-build docker-run up down
 
 build:
@@ -22,7 +25,10 @@ test:
 check:
 	gofmt -w .
 	go vet ./...
-	go test -race ./...
+	@set -e; \
+	trap '$(TEST_COMPOSE) down >/dev/null 2>&1' EXIT; \
+	$(TEST_COMPOSE) up -d --wait; \
+	SIGNALDOCK_TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -race ./...
 
 clean:
 	rm -rf bin

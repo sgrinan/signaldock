@@ -1,13 +1,16 @@
 package endpoint
 
 import (
+	"context"
 	"errors"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"uuid"
 
+	"github.com/sgrinan/signaldock/internal/database"
 	"github.com/sgrinan/signaldock/internal/probe"
 )
 
@@ -15,7 +18,7 @@ import (
 
 func TestStore_Insert(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		store := NewStore()
+		store := newTestStore(t)
 		ep := testEndpoint("https://example.com/")
 
 		if err := store.Insert(ep); err != nil {
@@ -33,7 +36,7 @@ func TestStore_Insert(t *testing.T) {
 	})
 
 	t.Run("duplicate", func(t *testing.T) {
-		store := NewStore()
+		store := newTestStore(t)
 
 		first := testEndpoint("https://example.com/")
 		second := testEndpoint("https://example.com/")
@@ -47,14 +50,19 @@ func TestStore_Insert(t *testing.T) {
 			t.Errorf("Insert(%+v) error = %v, want %v", second, err, ErrEndpointExists)
 		}
 
-		if got, want := len(store.List()), 1; got != want {
+		endpoints, err := store.List()
+		if err != nil {
+			t.Fatalf("List() returned unexpected error: %v", err)
+		}
+
+		if got, want := len(endpoints), 1; got != want {
 			t.Errorf("len(List()) = %d, want %d", got, want)
 		}
 	})
 }
 
 func TestStore_InsertConcurrentDuplicate(t *testing.T) {
-	store := NewStore()
+	store := newTestStore(t)
 
 	const goroutines = 20
 
@@ -91,10 +99,7 @@ func TestStore_InsertConcurrentDuplicate(t *testing.T) {
 			duplicates++
 
 		default:
-			t.Errorf(
-				"Insert() returned unexpected error: %v",
-				err,
-			)
+			t.Errorf("Insert() returned unexpected error: %v", err)
 		}
 	}
 
@@ -106,7 +111,12 @@ func TestStore_InsertConcurrentDuplicate(t *testing.T) {
 		t.Errorf("duplicate Insert() calls = %d, want %d", got, want)
 	}
 
-	if got, want := len(store.List()), 1; got != want {
+	endpoints, err := store.List()
+	if err != nil {
+		t.Fatalf("List() returned unexpected error: %v", err)
+	}
+
+	if got, want := len(endpoints), 1; got != want {
 		t.Errorf("len(List()) = %d, want %d", got, want)
 	}
 }
@@ -114,7 +124,7 @@ func TestStore_InsertConcurrentDuplicate(t *testing.T) {
 // Store.List
 
 func TestStore_List(t *testing.T) {
-	store := NewStore()
+	store := newTestStore(t)
 
 	first := testEndpoint("https://example.com/")
 	second := testEndpoint("https://example.org/")
@@ -127,7 +137,10 @@ func TestStore_List(t *testing.T) {
 		t.Fatalf("Insert(%+v) returned unexpected error: %v", second, err)
 	}
 
-	got := store.List()
+	got, err := store.List()
+	if err != nil {
+		t.Fatalf("List() returned unexpected error: %v", err)
+	}
 
 	if gotLen, wantLen := len(got), 2; gotLen != wantLen {
 		t.Fatalf("len(List()) = %d, want %d", gotLen, wantLen)
@@ -152,7 +165,7 @@ func TestStore_List(t *testing.T) {
 // Store.ByID
 
 func TestStore_ByID(t *testing.T) {
-	store := NewStore()
+	store := newTestStore(t)
 	ep := testEndpoint("https://example.com/")
 
 	if err := store.Insert(ep); err != nil {
@@ -183,7 +196,7 @@ func TestStore_ByID(t *testing.T) {
 
 func TestStore_RemoveByID(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		store := NewStore()
+		store := newTestStore(t)
 		ep := testEndpoint("https://example.com/")
 
 		if err := store.Insert(ep); err != nil {
@@ -200,7 +213,7 @@ func TestStore_RemoveByID(t *testing.T) {
 	})
 
 	t.Run("not_found", func(t *testing.T) {
-		store := NewStore()
+		store := newTestStore(t)
 		id := uuid.NewV7()
 
 		if err := store.RemoveByID(id); !errors.Is(err, ErrEndpointNotFound) {
@@ -213,7 +226,7 @@ func TestStore_RemoveByID(t *testing.T) {
 
 func TestStore_UpdateLastCheck(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		store := NewStore()
+		store := newTestStore(t)
 		ep := testEndpoint("https://example.com/")
 
 		if err := store.Insert(ep); err != nil {
@@ -247,7 +260,7 @@ func TestStore_UpdateLastCheck(t *testing.T) {
 	})
 
 	t.Run("not_found", func(t *testing.T) {
-		store := NewStore()
+		store := newTestStore(t)
 		id := uuid.NewV7()
 
 		if err := store.UpdateLastCheck(id, CheckResult{}); !errors.Is(err, ErrEndpointNotFound) {
@@ -263,4 +276,32 @@ func testEndpoint(rawURL string) Endpoint {
 		ID:  uuid.NewV7(),
 		URL: rawURL,
 	}
+}
+
+func newTestStore(t *testing.T) *Store {
+	t.Helper()
+
+	databaseURL := os.Getenv("SIGNALDOCK_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Fatal("SIGNALDOCK_TEST_DATABASE_URL is required")
+	}
+
+	ctx := context.Background()
+
+	pool, err := database.NewPostgresPool(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("NewPostgresPool() error = %v", err)
+	}
+
+	t.Cleanup(pool.Close)
+
+	if err := database.ApplyMigrations(ctx, pool); err != nil {
+		t.Fatalf("ApplyMigrations() error = %v", err)
+	}
+
+	if _, err := pool.Exec(ctx, `TRUNCATE TABLE endpoints`); err != nil {
+		t.Fatalf("TRUNCATE endpoints error = %v", err)
+	}
+
+	return NewStore(pool)
 }

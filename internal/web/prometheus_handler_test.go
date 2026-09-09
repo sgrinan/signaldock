@@ -57,8 +57,8 @@ func TestHandler_HandlePrometheusTargets(t *testing.T) {
 			}
 
 			service := &fakeEndpointService{
-				listFunc: func() []endpoint.Endpoint {
-					return tt.endpoints
+				listFunc: func() ([]endpoint.Endpoint, error) {
+					return tt.endpoints, nil
 				},
 			}
 

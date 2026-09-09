@@ -15,15 +15,7 @@ ARG TARGETARCH
 ARG VERSION=dev
 ARG COMMIT=unknown
 
-RUN CGO_ENABLED=0 \
-    GOOS=$TARGETOS \
-    GOARCH=$TARGETARCH \
-    go build \
-        -trimpath \
-        -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT}" \
-        -o /out/signaldock \
-        ./cmd/signaldock
-
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT}" -o /out/signaldock ./cmd/signaldock
 
         
 # Runtime

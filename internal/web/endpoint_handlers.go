@@ -20,7 +20,13 @@ func (h *handler) handleGetIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	endpoints := h.endpoints.List()
+	endpoints, err := h.endpoints.List()
+	if err != nil {
+		h.logger.Error("failed to list endpoints", "error", err)
+
+		http.Error(w, "failed to render page", http.StatusInternalServerError)
+		return
+	}
 
 	data := pageData{
 		Endpoints: newEndpointListItems(endpoints),

@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sgrinan/signaldock/internal/database"
 	"github.com/sgrinan/signaldock/internal/endpoint"
 	"github.com/sgrinan/signaldock/internal/web"
 )
@@ -38,8 +39,40 @@ func main() {
 		slog.NewTextHandler(os.Stdout, nil),
 	)
 
-	store := endpoint.NewStore()
+	databaseURL := os.Getenv("SIGNALDOCK_DATABASE_URL")
+	if databaseURL == "" {
+		logger.Error("SIGNALDOCK_DATABASE_URL is required")
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+
+	pool, err := database.NewPostgresPool(ctx, databaseURL)
+	if err != nil {
+		logger.Error("failed to connect to PostgreSQL", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	if err := database.ApplyMigrations(ctx, pool); err != nil {
+		logger.Error("failed to apply database migrations", "error", err)
+		os.Exit(1)
+	}
+
+	store := endpoint.NewStore(pool)
 	service := endpoint.NewService(store)
+
+	endpoints, err := service.List()
+	if err != nil {
+		logger.Error("failed to load endpoints", "error", err)
+		os.Exit(1)
+	}
+
+	for _, ep := range endpoints {
+		if _, err := service.Refresh(ep.ID); err != nil {
+			logger.Warn("failed to refresh endpoint on startup", "endpoint_id", ep.ID, "url", ep.URL, "error", err)
+		}
+	}
 
 	handler, err := web.NewHandler(service, logger)
 	if err != nil {

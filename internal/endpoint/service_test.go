@@ -67,7 +67,12 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("Add(%q) = %+v, want zero Endpoint", rawURL, got)
 		}
 
-		if got := len(store.List()); got != 0 {
+		endpoints, err := store.List()
+		if err != nil {
+			t.Fatalf("List() returned unexpected error: %v", err)
+		}
+
+		if got := len(endpoints); got != 0 {
 			t.Errorf("len(List()) = %d, want 0", got)
 		}
 	})
@@ -91,7 +96,12 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("Add(%q) = %+v, want zero Endpoint", rawURL, got)
 		}
 
-		if got := len(store.List()); got != 0 {
+		endpoints, err := store.List()
+		if err != nil {
+			t.Fatalf("List() returned unexpected error: %v", err)
+		}
+
+		if got := len(endpoints); got != 0 {
 			t.Errorf("len(List()) = %d, want 0", got)
 		}
 	})
@@ -191,7 +201,12 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("second Add(%q) error = %v, want %v", rawURL, err, ErrEndpointExists)
 		}
 
-		if got := len(store.List()); got != 1 {
+		endpoints, err := store.List()
+		if err != nil {
+			t.Fatalf("List() returned unexpected error: %v", err)
+		}
+
+		if got := len(endpoints); got != 1 {
 			t.Errorf("len(List()) = %d, want 1", got)
 		}
 
@@ -275,7 +290,12 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 		t.Errorf("duplicate Add() calls = %d, want %d", got, want)
 	}
 
-	if got, want := len(store.List()), 1; got != want {
+	endpoints, err := store.List()
+	if err != nil {
+		t.Fatalf("List() returned unexpected error: %v", err)
+	}
+
+	if got, want := len(endpoints), 1; got != want {
 		t.Errorf("len(List()) = %d, want %d", got, want)
 	}
 
@@ -448,8 +468,13 @@ func TestService_Refresh(t *testing.T) {
 
 // Test helpers
 
-func newTestService() (*Service, *Store) {
-	store := NewStore()
+type fakeStore struct {
+	mu        sync.RWMutex
+	endpoints []Endpoint
+}
+
+func newTestService() (*Service, *fakeStore) {
+	store := &fakeStore{}
 	s := NewService(store)
 
 	ips := []netip.Addr{
@@ -475,4 +500,68 @@ func newTestService() (*Service, *Store) {
 	}
 
 	return s, store
+}
+
+func (store *fakeStore) Insert(endpoint Endpoint) error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	for _, existing := range store.endpoints {
+		if existing.URL == endpoint.URL {
+			return ErrEndpointExists
+		}
+	}
+
+	store.endpoints = append(store.endpoints, endpoint)
+
+	return nil
+}
+
+func (store *fakeStore) List() ([]Endpoint, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	endpoints := make([]Endpoint, len(store.endpoints))
+	copy(endpoints, store.endpoints)
+
+	return endpoints, nil
+}
+
+func (store *fakeStore) ByID(id uuid.UUID) (Endpoint, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	for _, endpoint := range store.endpoints {
+		if endpoint.ID == id {
+			return endpoint, nil
+		}
+	}
+	return Endpoint{}, ErrEndpointNotFound
+}
+
+func (store *fakeStore) RemoveByID(id uuid.UUID) error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	for index, endpoint := range store.endpoints {
+		if endpoint.ID == id {
+			store.endpoints = append(store.endpoints[:index], store.endpoints[index+1:]...)
+			return nil
+		}
+	}
+	return ErrEndpointNotFound
+}
+
+func (store *fakeStore) UpdateLastCheck(id uuid.UUID, result CheckResult) error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	for index, endpoint := range store.endpoints {
+		if endpoint.ID == id {
+			store.endpoints[index].LastCheck = result
+			return nil
+		}
+	}
+
+	return ErrEndpointNotFound
 }

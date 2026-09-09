@@ -64,11 +64,11 @@ func TestHandler_HandleGetIndex(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := &fakeEndpointService{
-				listFunc: func() []endpoint.Endpoint {
+				listFunc: func() ([]endpoint.Endpoint, error) {
 					return []endpoint.Endpoint{
 						{ID: uuid.NewV7()},
 						{ID: uuid.NewV7()},
-					}
+					}, nil
 				},
 			}
 
@@ -640,7 +640,7 @@ func TestHandler_HandleRefreshEndpoint(t *testing.T) {
 
 type fakeEndpointService struct {
 	addFunc        func(string) (endpoint.Endpoint, error)
-	listFunc       func() []endpoint.Endpoint
+	listFunc       func() ([]endpoint.Endpoint, error)
 	byIDFunc       func(uuid.UUID) (endpoint.Endpoint, error)
 	removeByIDFunc func(uuid.UUID) error
 	refreshFunc    func(uuid.UUID) (endpoint.CheckResult, error)
@@ -656,12 +656,12 @@ func (f *fakeEndpointService) Add(rawURL string) (endpoint.Endpoint, error) {
 	return endpoint.Endpoint{}, nil
 }
 
-func (f *fakeEndpointService) List() []endpoint.Endpoint {
+func (f *fakeEndpointService) List() ([]endpoint.Endpoint, error) {
 	if f.listFunc != nil {
 		return f.listFunc()
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (f *fakeEndpointService) ByID(id uuid.UUID) (endpoint.Endpoint, error) {

@@ -14,14 +14,22 @@ import (
 
 // Service coordinates endpoint validation, checks, and storage.
 type Service struct {
-	store        *Store
+	store        endpointStore
 	validateHost func(string) ([]netip.Addr, error)
 	probeHTTP    func(*url.URL, []netip.Addr) (probe.HTTPResult, error)
 	probeTLS     func(*url.URL, []netip.Addr) (probe.TLSResult, error)
 }
 
-// NewService returns a Service backed by store.
-func NewService(store *Store) *Service {
+type endpointStore interface {
+	Insert(endpoint Endpoint) error
+	List() ([]Endpoint, error)
+	ByID(id uuid.UUID) (Endpoint, error)
+	RemoveByID(id uuid.UUID) error
+	UpdateLastCheck(id uuid.UUID, result CheckResult) error
+}
+
+// NewService returns a Service backed by the provided endpoint store.
+func NewService(store endpointStore) *Service {
 	return &Service{
 		store:        store,
 		validateHost: probe.ValidateHost,
@@ -113,7 +121,7 @@ func (s *Service) Refresh(id uuid.UUID) (CheckResult, error) {
 }
 
 // List returns a snapshot of the stored endpoints.
-func (s *Service) List() []Endpoint {
+func (s *Service) List() ([]Endpoint, error) {
 	return s.store.List()
 }
 

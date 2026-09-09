@@ -11,7 +11,13 @@ type prometheusTargetGroup struct {
 }
 
 func (h *handler) handlePrometheusTargets(writer http.ResponseWriter, _ *http.Request) {
-	endpoints := h.endpoints.List()
+	endpoints, err := h.endpoints.List()
+	if err != nil {
+		h.logger.Error("failed to list endpoints", "error", err)
+
+		http.Error(writer, "failed to list endpoints", http.StatusInternalServerError)
+		return
+	}
 
 	targets := make([]prometheusTargetGroup, 0, len(endpoints))
 

@@ -18,7 +18,7 @@ var assets embed.FS
 
 type endpointService interface {
 	Add(string) (endpoint.Endpoint, error)
-	List() []endpoint.Endpoint
+	List() ([]endpoint.Endpoint, error)
 	ByID(uuid.UUID) (endpoint.Endpoint, error)
 	RemoveByID(uuid.UUID) error
 	Refresh(uuid.UUID) (endpoint.CheckResult, error)
