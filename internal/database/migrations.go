@@ -25,6 +25,13 @@ func ApplyMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 
 			CHECK (role IN ('admin', 'viewer'))
 		);
+
+		CREATE TABLE IF NOT EXISTS sessions (
+			token_hash TEXT PRIMARY KEY,
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			expires_at TIMESTAMPTZ NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
 	`
 
 	if _, err := pool.Exec(ctx, query); err != nil {

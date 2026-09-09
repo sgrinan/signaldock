@@ -28,7 +28,7 @@ check:
 	@set -e; \
 	trap '$(TEST_COMPOSE) down >/dev/null 2>&1' EXIT; \
 	$(TEST_COMPOSE) up -d --wait; \
-	SIGNALDOCK_TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -race ./...
+	SIGNALDOCK_TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -race -p 1 ./...
 
 clean:
 	rm -rf bin

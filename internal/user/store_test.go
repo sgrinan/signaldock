@@ -13,33 +13,7 @@ import (
 	"github.com/sgrinan/signaldock/internal/database"
 )
 
-func newTestStore(t *testing.T) *Store {
-	t.Helper()
-
-	databaseURL := os.Getenv("SIGNALDOCK_TEST_DATABASE_URL")
-	if databaseURL == "" {
-		t.Fatal("SIGNALDOCK_TEST_DATABASE_URL is required")
-	}
-
-	ctx := context.Background()
-
-	pool, err := database.NewPostgresPool(ctx, databaseURL)
-	if err != nil {
-		t.Fatalf("NewPostgresPool() error = %v", err)
-	}
-
-	t.Cleanup(pool.Close)
-
-	if err := database.ApplyMigrations(ctx, pool); err != nil {
-		t.Fatalf("ApplyMigrations() error = %v", err)
-	}
-
-	if _, err := pool.Exec(ctx, `TRUNCATE TABLE users`); err != nil {
-		t.Fatalf("TRUNCATE users error = %v", err)
-	}
-
-	return NewStore(pool)
-}
+// user.Insert
 
 func TestStore_Insert(t *testing.T) {
 	store := newTestStore(t)
@@ -164,6 +138,8 @@ func TestStore_InsertConcurrentDuplicate(t *testing.T) {
 	}
 }
 
+// user.List
+
 func TestStore_List(t *testing.T) {
 	store := newTestStore(t)
 
@@ -224,6 +200,8 @@ func TestStore_List(t *testing.T) {
 	}
 }
 
+// user.ByID
+
 func TestStore_ByID(t *testing.T) {
 	store := newTestStore(t)
 
@@ -275,6 +253,8 @@ func TestStore_ByIDNotFound(t *testing.T) {
 	}
 }
 
+// user.ByUsername
+
 func TestStore_ByUsername(t *testing.T) {
 	store := newTestStore(t)
 
@@ -320,6 +300,8 @@ func TestStore_ByUsernameNotFound(t *testing.T) {
 		t.Fatalf("ByUsername() error = %v, want ErrUserNotFound", err)
 	}
 }
+
+// user.SetDisabled
 
 func TestStore_SetDisabled(t *testing.T) {
 	store := newTestStore(t)
@@ -370,4 +352,34 @@ func TestStore_SetDisabledNotFound(t *testing.T) {
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("SetDisabled() error = %v, want ErrUserNotFound", err)
 	}
+}
+
+// helper
+
+func newTestStore(t *testing.T) *Store {
+	t.Helper()
+
+	databaseURL := os.Getenv("SIGNALDOCK_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Fatal("SIGNALDOCK_TEST_DATABASE_URL is required")
+	}
+
+	ctx := context.Background()
+
+	pool, err := database.NewPostgresPool(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("NewPostgresPool() error = %v", err)
+	}
+
+	t.Cleanup(pool.Close)
+
+	if err := database.ApplyMigrations(ctx, pool); err != nil {
+		t.Fatalf("ApplyMigrations() error = %v", err)
+	}
+
+	if _, err := pool.Exec(ctx, `TRUNCATE TABLE sessions, users`); err != nil {
+		t.Fatalf("TRUNCATE sessions, users error = %v", err)
+	}
+
+	return NewStore(pool)
 }
