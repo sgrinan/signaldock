@@ -27,6 +27,19 @@ services:
       - "9090:9090"
     depends_on:
       - blackbox
+      - signaldock
+
+  grafana:
+    image: grafana/grafana:13.2.1
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
 
 volumes:
   prometheus-data:
+  grafana-data:
