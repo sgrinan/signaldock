@@ -88,3 +88,33 @@ func (h *handler) renderLoginError(w http.ResponseWriter, r *http.Request) {
 
 	h.renderStatus(w, http.StatusUnauthorized, "login.html", data)
 }
+
+func (h *handler) handlePostLogout(w http.ResponseWriter, r *http.Request) {
+	if !validateCSRF(r) {
+		http.Error(w, "invalid CSRF token", http.StatusForbidden)
+		return
+	}
+
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil {
+		if errors.Is(err, http.ErrNoCookie) {
+			clearSessionCookie(w)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		http.Error(w, "failed to sign out", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.sessions.Delete(cookie.Value); err != nil {
+		h.logger.Error("failed to delete session", "error", err)
+
+		http.Error(w, "failed to sign out", http.StatusInternalServerError)
+		return
+	}
+
+	clearSessionCookie(w)
+
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}

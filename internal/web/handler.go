@@ -59,6 +59,7 @@ func NewHandler(endpoints endpointService, users userStore, sessions sessionServ
 	mux.HandleFunc("GET /{$}", h.handleGetIndex)
 	mux.HandleFunc("GET /login", h.handleGetLogin)
 	mux.HandleFunc("POST /login", h.handlePostLogin)
+	mux.HandleFunc("POST /logout", h.handlePostLogout)
 	mux.HandleFunc("POST /endpoints", h.handlePostEndpoint)
 	mux.HandleFunc("GET /endpoints/{id}", h.handleGetEndpoint)
 	mux.HandleFunc("POST /endpoints/{id}/delete", h.handleDeleteEndpoint)
