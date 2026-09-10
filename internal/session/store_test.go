@@ -220,8 +220,8 @@ func newTestStore(t *testing.T) *Store {
 
 	t.Cleanup(pool.Close)
 
-	if err := database.ApplyMigrations(ctx, pool); err != nil {
-		t.Fatalf("ApplyMigrations() error = %v", err)
+	if err := database.EnsureSchema(ctx, pool); err != nil {
+		t.Fatalf("EnsureSchema() error = %v", err)
 	}
 
 	if _, err := pool.Exec(ctx, `TRUNCATE TABLE sessions, users`); err != nil {

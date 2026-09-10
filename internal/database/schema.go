@@ -7,7 +7,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func ApplyMigrations(ctx context.Context, pool *pgxpool.Pool) error {
+// EnsureSchema creates the database tables required by SignalDock
+// when they do not already exist.
+func EnsureSchema(ctx context.Context, pool *pgxpool.Pool) error {
 	const query = `
 		CREATE TABLE IF NOT EXISTS endpoints (
 			id UUID PRIMARY KEY,
@@ -35,7 +37,7 @@ func ApplyMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	`
 
 	if _, err := pool.Exec(ctx, query); err != nil {
-		return fmt.Errorf("apply database migrations: %w", err)
+		return fmt.Errorf("ensure database schema: %w", err)
 	}
 
 	return nil

@@ -59,7 +59,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := database.ApplyMigrations(ctx, pool); err != nil {
+	if err := database.EnsureSchema(ctx, pool); err != nil {
 		logger.Error("failed to apply database migrations", "error", err)
 		os.Exit(1)
 	}

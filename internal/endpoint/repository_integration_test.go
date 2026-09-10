@@ -254,8 +254,8 @@ func newTestRepository(t *testing.T) *Repository {
 
 	t.Cleanup(pool.Close)
 
-	if err := database.ApplyMigrations(ctx, pool); err != nil {
-		t.Fatalf("ApplyMigrations() error = %v, want nil", err)
+	if err := database.EnsureSchema(ctx, pool); err != nil {
+		t.Fatalf("EnsureSchema() error = %v, want nil", err)
 	}
 
 	if _, err := pool.Exec(ctx, `TRUNCATE TABLE endpoints`); err != nil {
