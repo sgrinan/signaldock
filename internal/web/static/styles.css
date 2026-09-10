@@ -164,6 +164,16 @@ main {
     font-size: 0.8rem;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-actions form {
+    margin: 0;
+}
+
 
 /* Endpoint form */
 

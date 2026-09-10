@@ -8,6 +8,7 @@
     <title>SignalDock</title>
 
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/time.js" defer></script>
 </head>
 
 <body>
@@ -17,8 +18,25 @@
     <header class="site-header">
         <div class="container">
             <a class="brand" href="/">SignalDock</a>
-            <span class="header-label">Endpoint monitoring</span>
-            <script src="/static/time.js" defer></script>
+
+            <div class="header-actions">
+                <span class="header-label">Endpoint monitoring</span>
+
+                <form method="POST" action="/logout">
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ .CSRFToken }}"
+                    >
+
+                    <button
+                        class="button button-secondary"
+                        type="submit"
+                    >
+                        Sign out
+                    </button>
+                </form>
+            </div>
         </div>
     </header>
 

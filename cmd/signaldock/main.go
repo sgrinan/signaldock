@@ -11,11 +11,14 @@ import (
 	"syscall"
 	"time"
 
+	"uuid"
+
 	"github.com/sgrinan/signaldock/internal/database"
 	"github.com/sgrinan/signaldock/internal/endpoint"
 	"github.com/sgrinan/signaldock/internal/session"
 	"github.com/sgrinan/signaldock/internal/user"
 	"github.com/sgrinan/signaldock/internal/web"
+	"github.com/sgrinan/signaldock/internal/auth"
 )
 
 const (
@@ -65,6 +68,36 @@ func main() {
 	service := endpoint.NewService(store)
 
 	userStore := user.NewStore(pool)
+
+	users, err := userStore.List()
+	if err != nil {
+		logger.Error("failed to load users", "error", err)
+		os.Exit(1)
+	}
+
+	if len(users) == 0 {
+		username := os.Getenv("SIGNALDOCK_ADMIN_USERNAME")
+		password := os.Getenv("SIGNALDOCK_ADMIN_PASSWORD")
+
+		if username == "" || password == "" {
+			logger.Error("initial admin credentials are required")
+			os.Exit(1)
+		}
+
+		admin := user.User{
+			ID:           uuid.NewV7(),
+			Username:     username,
+			PasswordHash: auth.HashPassword(password),
+			Role:         user.RoleAdmin,
+		}
+
+		if err := userStore.Insert(admin); err != nil {
+			logger.Error("failed to create initial admin", "error", err)
+			os.Exit(1)
+		}
+
+		logger.Info("initial admin created", "username", username)
+	}
 
 	sessionStore := session.NewStore(pool)
 	sessionService := session.NewService(sessionStore)

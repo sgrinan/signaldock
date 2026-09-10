@@ -6,6 +6,8 @@ services:
     image: signaldock:dev
     environment:
       SIGNALDOCK_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      SIGNALDOCK_ADMIN_USERNAME: ${SIGNALDOCK_ADMIN_USERNAME}
+      SIGNALDOCK_ADMIN_PASSWORD: ${SIGNALDOCK_ADMIN_PASSWORD}
     ports:
       - "8080:8080"
     depends_on:
