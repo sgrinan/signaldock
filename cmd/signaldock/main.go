@@ -13,6 +13,8 @@ import (
 
 	"github.com/sgrinan/signaldock/internal/database"
 	"github.com/sgrinan/signaldock/internal/endpoint"
+	"github.com/sgrinan/signaldock/internal/session"
+	"github.com/sgrinan/signaldock/internal/user"
 	"github.com/sgrinan/signaldock/internal/web"
 )
 
@@ -62,6 +64,11 @@ func main() {
 	store := endpoint.NewStore(pool)
 	service := endpoint.NewService(store)
 
+	userStore := user.NewStore(pool)
+
+	sessionStore := session.NewStore(pool)
+	sessionService := session.NewService(sessionStore)
+
 	endpoints, err := service.List()
 	if err != nil {
 		logger.Error("failed to load endpoints", "error", err)
@@ -74,7 +81,7 @@ func main() {
 		}
 	}
 
-	handler, err := web.NewHandler(service, logger)
+	handler, err := web.NewHandler(service, userStore, sessionService, logger)
 	if err != nil {
 		logger.Error("failed to create HTTP handler", "error", err)
 		os.Exit(1)

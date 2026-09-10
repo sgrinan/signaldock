@@ -26,12 +26,14 @@ type endpointService interface {
 
 type handler struct {
 	endpoints endpointService
+	users     userStore
+	sessions  sessionService
 	templates *template.Template
 	logger    *slog.Logger
 }
 
 // NewHandler returns the HTTP handler for the SignalDock web interface.
-func NewHandler(service endpointService, logger *slog.Logger) (http.Handler, error) {
+func NewHandler(endpoints endpointService, users userStore, sessions sessionService, logger *slog.Logger) (http.Handler, error) {
 	tmpl, err := template.ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
@@ -43,7 +45,9 @@ func NewHandler(service endpointService, logger *slog.Logger) (http.Handler, err
 	}
 
 	h := &handler{
-		endpoints: service,
+		endpoints: endpoints,
+		users:     users,
+		sessions:  sessions,
 		templates: tmpl,
 		logger:    logger,
 	}
