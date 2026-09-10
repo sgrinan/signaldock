@@ -9,8 +9,8 @@ import (
 	"uuid"
 )
 
-func TestStore_Insert(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_Insert(t *testing.T) {
+	repository := newTestRepository(t)
 
 	want := User{
 		ID:           uuid.NewV7(),
@@ -20,11 +20,11 @@ func TestStore_Insert(t *testing.T) {
 		Disabled:     false,
 	}
 
-	if err := store.Insert(want); err != nil {
+	if err := repository.Insert(want); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	got, err := store.ByID(want.ID)
+	got, err := repository.ByID(want.ID)
 	if err != nil {
 		t.Fatalf("ByID() error = %v, want nil", err)
 	}
@@ -54,8 +54,8 @@ func TestStore_Insert(t *testing.T) {
 	}
 }
 
-func TestStore_InsertDuplicate(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_InsertDuplicate(t *testing.T) {
+	repository := newTestRepository(t)
 
 	first := User{
 		ID:           uuid.NewV7(),
@@ -71,19 +71,19 @@ func TestStore_InsertDuplicate(t *testing.T) {
 		Role:         RoleViewer,
 	}
 
-	if err := store.Insert(first); err != nil {
+	if err := repository.Insert(first); err != nil {
 		t.Fatalf("first Insert() error = %v, want nil", err)
 	}
 
-	err := store.Insert(second)
+	err := repository.Insert(second)
 
 	if !errors.Is(err, ErrUserExists) {
 		t.Fatalf("second Insert() error = %v, want ErrUserExists", err)
 	}
 }
 
-func TestStore_InsertConcurrentDuplicate(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
+	repository := newTestRepository(t)
 
 	const goroutines = 20
 
@@ -106,7 +106,7 @@ func TestStore_InsertConcurrentDuplicate(t *testing.T) {
 				Role:         RoleAdmin,
 			}
 
-			err := store.Insert(user)
+			err := repository.Insert(user)
 
 			switch {
 			case err == nil:

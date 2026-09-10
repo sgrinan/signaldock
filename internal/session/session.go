@@ -6,6 +6,7 @@ import (
 	"uuid"
 )
 
+// Session represents an authenticated user session.
 type Session struct {
 	TokenHash string
 	UserID    uuid.UUID

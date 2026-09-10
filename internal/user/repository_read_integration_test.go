@@ -7,8 +7,8 @@ import (
 	"uuid"
 )
 
-func TestStore_List(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_List(t *testing.T) {
+	repository := newTestRepository(t)
 
 	users := []User{
 		{
@@ -26,12 +26,12 @@ func TestStore_List(t *testing.T) {
 	}
 
 	for _, user := range users {
-		if err := store.Insert(user); err != nil {
+		if err := repository.Insert(user); err != nil {
 			t.Fatalf("Insert() error = %v, want nil", err)
 		}
 	}
 
-	got, err := store.List()
+	got, err := repository.List()
 	if err != nil {
 		t.Fatalf("List() error = %v, want nil", err)
 	}
@@ -67,8 +67,8 @@ func TestStore_List(t *testing.T) {
 	}
 }
 
-func TestStore_ByID(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_ByID(t *testing.T) {
+	repository := newTestRepository(t)
 
 	want := User{
 		ID:           uuid.NewV7(),
@@ -78,11 +78,11 @@ func TestStore_ByID(t *testing.T) {
 		Disabled:     true,
 	}
 
-	if err := store.Insert(want); err != nil {
+	if err := repository.Insert(want); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	got, err := store.ByID(want.ID)
+	got, err := repository.ByID(want.ID)
 	if err != nil {
 		t.Fatalf("ByID() error = %v, want nil", err)
 	}
@@ -108,18 +108,18 @@ func TestStore_ByID(t *testing.T) {
 	}
 }
 
-func TestStore_ByIDNotFound(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_ByIDNotFound(t *testing.T) {
+	repository := newTestRepository(t)
 
-	_, err := store.ByID(uuid.NewV7())
+	_, err := repository.ByID(uuid.NewV7())
 
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("ByID() error = %v, want ErrUserNotFound", err)
 	}
 }
 
-func TestStore_ByUsername(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_ByUsername(t *testing.T) {
+	repository := newTestRepository(t)
 
 	want := User{
 		ID:           uuid.NewV7(),
@@ -128,11 +128,11 @@ func TestStore_ByUsername(t *testing.T) {
 		Role:         RoleAdmin,
 	}
 
-	if err := store.Insert(want); err != nil {
+	if err := repository.Insert(want); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	got, err := store.ByUsername(want.Username)
+	got, err := repository.ByUsername(want.Username)
 	if err != nil {
 		t.Fatalf("ByUsername() error = %v, want nil", err)
 	}
@@ -154,10 +154,10 @@ func TestStore_ByUsername(t *testing.T) {
 	}
 }
 
-func TestStore_ByUsernameNotFound(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_ByUsernameNotFound(t *testing.T) {
+	repository := newTestRepository(t)
 
-	_, err := store.ByUsername("missing")
+	_, err := repository.ByUsername("missing")
 
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("ByUsername() error = %v, want ErrUserNotFound", err)

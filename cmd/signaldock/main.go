@@ -100,7 +100,7 @@ func main() {
 		logger.Info("initial admin created", "username", username)
 	}
 
-	sessionStore := session.NewStore(pool)
+	sessionStore := session.NewRepository(pool)
 	sessionService := session.NewService(sessionStore)
 
 	endpoints, err := endpointService.List()

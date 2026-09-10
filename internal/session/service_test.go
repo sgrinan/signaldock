@@ -8,53 +8,23 @@ import (
 	"uuid"
 )
 
-type fakeSessionStore struct {
-	insertFunc      func(Session) error
-	byTokenHashFunc func(string) (Session, error)
-	deleteFunc      func(string) error
-}
-
-func (f *fakeSessionStore) Insert(session Session) error {
-	if f.insertFunc != nil {
-		return f.insertFunc(session)
-	}
-
-	return nil
-}
-
-func (f *fakeSessionStore) ByTokenHash(tokenHash string) (Session, error) {
-	if f.byTokenHashFunc != nil {
-		return f.byTokenHashFunc(tokenHash)
-	}
-
-	return Session{}, ErrSessionNotFound
-}
-
-func (f *fakeSessionStore) Delete(tokenHash string) error {
-	if f.deleteFunc != nil {
-		return f.deleteFunc(tokenHash)
-	}
-
-	return nil
-}
-
 func TestService_Create(t *testing.T) {
 	userID := uuid.NewV7()
 
 	var inserted Session
 
-	store := &fakeSessionStore{
+	repository := &fakeSessionRepository{
 		insertFunc: func(session Session) error {
 			inserted = session
 			return nil
 		},
 	}
 
-	service := NewService(store)
+	service := NewService(repository)
 
 	token, err := service.Create(userID)
 	if err != nil {
-		t.Fatalf("Create(%v) error = %v", userID, err)
+		t.Fatalf("Create(%v) error = %v, want nil", userID, err)
 	}
 
 	if token == "" {
@@ -80,10 +50,10 @@ func TestService_Validate(t *testing.T) {
 	want := Session{
 		TokenHash: HashToken(token),
 		UserID:    uuid.NewV7(),
-		ExpiresAt: time.Now().UTC().Add(time.Hour),
+		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
-	store := &fakeSessionStore{
+	repository := &fakeSessionRepository{
 		byTokenHashFunc: func(tokenHash string) (Session, error) {
 			if tokenHash != want.TokenHash {
 				t.Errorf("ByTokenHash(%q), want %q", tokenHash, want.TokenHash)
@@ -93,11 +63,11 @@ func TestService_Validate(t *testing.T) {
 		},
 	}
 
-	service := NewService(store)
+	service := NewService(repository)
 
 	got, err := service.Validate(token)
 	if err != nil {
-		t.Fatalf("Validate(token) error = %v", err)
+		t.Fatalf("Validate(token) error = %v, want nil", err)
 	}
 
 	if got != want {
@@ -112,12 +82,12 @@ func TestService_ValidateExpired(t *testing.T) {
 	session := Session{
 		TokenHash: tokenHash,
 		UserID:    uuid.NewV7(),
-		ExpiresAt: time.Now().UTC().Add(-time.Hour),
+		ExpiresAt: time.Now().Add(-time.Hour),
 	}
 
 	deleted := false
 
-	store := &fakeSessionStore{
+	repository := &fakeSessionRepository{
 		byTokenHashFunc: func(string) (Session, error) {
 			return session, nil
 		},
@@ -131,7 +101,7 @@ func TestService_ValidateExpired(t *testing.T) {
 		},
 	}
 
-	service := NewService(store)
+	service := NewService(repository)
 
 	_, err := service.Validate(token)
 
@@ -147,13 +117,13 @@ func TestService_ValidateExpired(t *testing.T) {
 func TestService_ValidateStoreError(t *testing.T) {
 	wantErr := errors.New("database error")
 
-	store := &fakeSessionStore{
+	repository := &fakeSessionRepository{
 		byTokenHashFunc: func(string) (Session, error) {
 			return Session{}, wantErr
 		},
 	}
 
-	service := NewService(store)
+	service := NewService(repository)
 
 	_, err := service.Validate("token")
 
@@ -166,7 +136,7 @@ func TestService_Delete(t *testing.T) {
 	token := GenerateToken()
 	wantHash := HashToken(token)
 
-	store := &fakeSessionStore{
+	repository := &fakeSessionRepository{
 		deleteFunc: func(tokenHash string) error {
 			if tokenHash != wantHash {
 				t.Errorf("Delete(%q), want %q", tokenHash, wantHash)
@@ -176,21 +146,21 @@ func TestService_Delete(t *testing.T) {
 		},
 	}
 
-	service := NewService(store)
+	service := NewService(repository)
 
 	if err := service.Delete(token); err != nil {
-		t.Fatalf("Delete(token) error = %v", err)
+		t.Fatalf("Delete(token) error = %v, want nil", err)
 	}
 }
 
 func TestService_DeleteNotFound(t *testing.T) {
-	store := &fakeSessionStore{
+	repository := &fakeSessionRepository{
 		deleteFunc: func(string) error {
 			return ErrSessionNotFound
 		},
 	}
 
-	service := NewService(store)
+	service := NewService(repository)
 
 	if err := service.Delete("token"); err != nil {
 		t.Errorf("Delete(token) error = %v, want nil", err)

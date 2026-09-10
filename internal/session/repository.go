@@ -12,23 +12,25 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Store struct {
+// Repository persists sessions in PostgreSQL.
+type Repository struct {
 	pool *pgxpool.Pool
 }
 
-func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{
+// NewRepository returns a Repository backed by pool.
+func NewRepository(pool *pgxpool.Pool) *Repository {
+	return &Repository{
 		pool: pool,
 	}
 }
 
-func (s *Store) Insert(session Session) error {
+func (r *Repository) Insert(session Session) error {
 	const query = `
 		INSERT INTO sessions (token_hash, user_id, expires_at)
 		VALUES ($1, $2, $3)
 	`
 
-	_, err := s.pool.Exec(context.Background(), query, session.TokenHash, session.UserID, session.ExpiresAt)
+	_, err := r.pool.Exec(context.Background(), query, session.TokenHash, session.UserID, session.ExpiresAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 
@@ -42,7 +44,7 @@ func (s *Store) Insert(session Session) error {
 	return nil
 }
 
-func (s *Store) ByTokenHash(tokenHash string) (Session, error) {
+func (r *Repository) ByTokenHash(tokenHash string) (Session, error) {
 	const query = `
 		SELECT token_hash, user_id::text, expires_at, created_at
 		FROM sessions
@@ -54,7 +56,7 @@ func (s *Store) ByTokenHash(tokenHash string) (Session, error) {
 		rawID   string
 	)
 
-	err := s.pool.QueryRow(context.Background(), query, tokenHash).Scan(&session.TokenHash, &rawID, &session.ExpiresAt, &session.CreatedAt)
+	err := r.pool.QueryRow(context.Background(), query, tokenHash).Scan(&session.TokenHash, &rawID, &session.ExpiresAt, &session.CreatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrSessionNotFound
@@ -72,13 +74,13 @@ func (s *Store) ByTokenHash(tokenHash string) (Session, error) {
 	return session, nil
 }
 
-func (s *Store) Delete(tokenHash string) error {
+func (r *Repository) Delete(tokenHash string) error {
 	const query = `
 		DELETE FROM sessions
 		WHERE token_hash = $1
 	`
 
-	result, err := s.pool.Exec(context.Background(), query, tokenHash)
+	result, err := r.pool.Exec(context.Background(), query, tokenHash)
 	if err != nil {
 		return fmt.Errorf("delete session: %w", err)
 	}
@@ -90,13 +92,13 @@ func (s *Store) Delete(tokenHash string) error {
 	return nil
 }
 
-func (s *Store) DeleteExpired() error {
+func (r *Repository) DeleteExpired() error {
 	const query = `
 		DELETE FROM sessions
 		WHERE expires_at <= NOW()
 	`
 
-	_, err := s.pool.Exec(context.Background(), query)
+	_, err := r.pool.Exec(context.Background(), query)
 	if err != nil {
 		return fmt.Errorf("delete expired sessions: %w", err)
 	}

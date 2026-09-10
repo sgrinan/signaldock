@@ -7,8 +7,8 @@ import (
 	"uuid"
 )
 
-func TestStore_SetDisabled(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_SetDisabled(t *testing.T) {
+	repository := newTestRepository(t)
 
 	user := User{
 		ID:           uuid.NewV7(),
@@ -17,15 +17,15 @@ func TestStore_SetDisabled(t *testing.T) {
 		Role:         RoleViewer,
 	}
 
-	if err := store.Insert(user); err != nil {
+	if err := repository.Insert(user); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	if err := store.SetDisabled(user.ID, true); err != nil {
+	if err := repository.SetDisabled(user.ID, true); err != nil {
 		t.Fatalf("SetDisabled() error = %v, want nil", err)
 	}
 
-	got, err := store.ByID(user.ID)
+	got, err := repository.ByID(user.ID)
 	if err != nil {
 		t.Fatalf("ByID() error = %v, want nil", err)
 	}
@@ -34,11 +34,11 @@ func TestStore_SetDisabled(t *testing.T) {
 		t.Error("Disabled = false, want true")
 	}
 
-	if err := store.SetDisabled(user.ID, false); err != nil {
+	if err := repository.SetDisabled(user.ID, false); err != nil {
 		t.Fatalf("SetDisabled() error = %v, want nil", err)
 	}
 
-	got, err = store.ByID(user.ID)
+	got, err = repository.ByID(user.ID)
 	if err != nil {
 		t.Fatalf("ByID() error = %v, want nil", err)
 	}
@@ -48,18 +48,18 @@ func TestStore_SetDisabled(t *testing.T) {
 	}
 }
 
-func TestStore_SetDisabledNotFound(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_SetDisabledNotFound(t *testing.T) {
+	repository := newTestRepository(t)
 
-	err := store.SetDisabled(uuid.NewV7(), true)
+	err := repository.SetDisabled(uuid.NewV7(), true)
 
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("SetDisabled() error = %v, want ErrUserNotFound", err)
 	}
 }
 
-func TestStore_SetRole(t *testing.T) {
-	store := newTestRepository(t)
+func TestRepository_SetRole(t *testing.T) {
+	repository := newTestRepository(t)
 
 	account := User{
 		ID:           uuid.NewV7(),
@@ -68,15 +68,15 @@ func TestStore_SetRole(t *testing.T) {
 		Role:         RoleViewer,
 	}
 
-	if err := store.Insert(account); err != nil {
+	if err := repository.Insert(account); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	if err := store.SetRole(account.ID, RoleAdmin); err != nil {
+	if err := repository.SetRole(account.ID, RoleAdmin); err != nil {
 		t.Fatalf("SetRole(%v, %q) error = %v, want nil", account.ID, RoleAdmin, err)
 	}
 
-	got, err := store.ByID(account.ID)
+	got, err := repository.ByID(account.ID)
 	if err != nil {
 		t.Fatalf("ByID(%v) error = %v, want nil", account.ID, err)
 	}
@@ -86,11 +86,11 @@ func TestStore_SetRole(t *testing.T) {
 	}
 }
 
-func TestStore_SetRoleNotFound(t *testing.T) {
+func TestRepository_SetRoleNotFound(t *testing.T) {
 	id := uuid.NewV7()
-	store := newTestRepository(t)
+	repository := newTestRepository(t)
 
-	err := store.SetRole(id, RoleAdmin)
+	err := repository.SetRole(id, RoleAdmin)
 
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("SetRole(%v, %q) error = %v, want ErrUserNotFound", id, RoleAdmin, err)
