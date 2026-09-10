@@ -22,6 +22,11 @@ type sessionService interface {
 	Delete(string) error
 }
 
+type loginPageData struct {
+	Error     string
+	CSRFToken string
+}
+
 func setSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,

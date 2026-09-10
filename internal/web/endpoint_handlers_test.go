@@ -703,8 +703,16 @@ func newTestHandler(service endpointService) *handler {
 		),
 	)
 
+	template.Must(
+		tmpl.New("login.html").Parse(
+			`{{.Error}}|{{if .CSRFToken}}csrf{{end}}`,
+		),
+	)
+
 	return &handler{
 		endpoints: service,
+		users:     &fakeUserStore{},
+		sessions:  &fakeSessionService{},
 		templates: tmpl,
 		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}

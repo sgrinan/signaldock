@@ -57,6 +57,8 @@ func NewHandler(endpoints endpointService, users userStore, sessions sessionServ
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	mux.HandleFunc("GET /{$}", h.handleGetIndex)
+	mux.HandleFunc("GET /login", h.handleGetLogin)
+	mux.HandleFunc("POST /login", h.handlePostLogin)
 	mux.HandleFunc("POST /endpoints", h.handlePostEndpoint)
 	mux.HandleFunc("GET /endpoints/{id}", h.handleGetEndpoint)
 	mux.HandleFunc("POST /endpoints/{id}/delete", h.handleDeleteEndpoint)
