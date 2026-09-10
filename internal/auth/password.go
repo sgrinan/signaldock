@@ -18,6 +18,7 @@ const (
 	keyLength          = 32
 )
 
+// HashPassword returns an Argon2id hash of password using a random salt.
 func HashPassword(password string) string {
 	salt := make([]byte, saltLength)
 	rand.Read(salt)
@@ -32,6 +33,8 @@ func HashPassword(password string) string {
 	return encodedHash
 }
 
+// VerifyPassword reports whether password matches encodedHash.
+// It returns an error if encodedHash is malformed or unsupported.
 func VerifyPassword(password, encodedHash string) (bool, error) {
 	parts := strings.Split(encodedHash, "$")
 

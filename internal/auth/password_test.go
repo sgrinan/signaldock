@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// HashPassword
 func TestHashPassword(t *testing.T) {
 	password := "correct horse battery staple"
 
@@ -31,7 +30,6 @@ func TestHashPasswordRandomSalt(t *testing.T) {
 	}
 }
 
-// VerifyPassword
 func TestVerifyPassword(t *testing.T) {
 	password := "correct-password"
 	hash := HashPassword(password)
@@ -57,7 +55,7 @@ func TestVerifyPassword(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := VerifyPassword(tt.password, hash)
 			if err != nil {
-				t.Fatalf("VerifyPassword(%q, hash) returned unexpected error: %v", tt.password, err)
+				t.Fatalf("VerifyPassword(%q, hash) error = %v, want nil", tt.password, err)
 			}
 
 			if got != tt.want {
