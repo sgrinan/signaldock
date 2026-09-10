@@ -16,8 +16,12 @@ type contextKey string
 const currentUserKey contextKey = "current-user"
 
 type userStore interface {
+	Insert(user.User) error
+	List() ([]user.User, error)
 	ByUsername(string) (user.User, error)
 	ByID(uuid.UUID) (user.User, error)
+	SetDisabled(uuid.UUID, bool) error
+	SetRole(uuid.UUID, user.Role) error
 }
 
 type sessionService interface {

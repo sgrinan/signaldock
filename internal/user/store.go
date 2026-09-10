@@ -160,3 +160,22 @@ func (s *Store) SetDisabled(id uuid.UUID, disabled bool) error {
 
 	return nil
 }
+
+func (s *Store) SetRole(id uuid.UUID, role Role) error {
+	const query = `
+		UPDATE users
+		SET role = $2
+		WHERE id = $1
+	`
+
+	result, err := s.pool.Exec(context.Background(), query, id, role)
+	if err != nil {
+		return fmt.Errorf("update user role: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}

@@ -16,8 +16,28 @@ import (
 )
 
 type fakeUserStore struct {
-	byUsernameFunc func(string) (user.User, error)
-	byIDFunc       func(uuid.UUID) (user.User, error)
+	insertFunc      func(user.User) error
+	listFunc        func() ([]user.User, error)
+	byUsernameFunc  func(string) (user.User, error)
+	byIDFunc        func(uuid.UUID) (user.User, error)
+	setDisabledFunc func(uuid.UUID, bool) error
+	setRoleFunc     func(uuid.UUID, user.Role) error
+}
+
+func (f *fakeUserStore) Insert(account user.User) error {
+	if f.insertFunc != nil {
+		return f.insertFunc(account)
+	}
+
+	return nil
+}
+
+func (f *fakeUserStore) List() ([]user.User, error) {
+	if f.listFunc != nil {
+		return f.listFunc()
+	}
+
+	return nil, nil
 }
 
 func (f *fakeUserStore) ByUsername(username string) (user.User, error) {
@@ -34,6 +54,22 @@ func (f *fakeUserStore) ByID(id uuid.UUID) (user.User, error) {
 	}
 
 	return user.User{}, user.ErrUserNotFound
+}
+
+func (f *fakeUserStore) SetDisabled(id uuid.UUID, disabled bool) error {
+	if f.setDisabledFunc != nil {
+		return f.setDisabledFunc(id, disabled)
+	}
+
+	return nil
+}
+
+func (f *fakeUserStore) SetRole(id uuid.UUID, role user.Role) error {
+	if f.setRoleFunc != nil {
+		return f.setRoleFunc(id, role)
+	}
+
+	return nil
 }
 
 type fakeSessionService struct {

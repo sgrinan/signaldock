@@ -354,6 +354,45 @@ func TestStore_SetDisabledNotFound(t *testing.T) {
 	}
 }
 
+func TestStore_SetRole(t *testing.T) {
+	store := newTestStore(t)
+
+	account := User{
+		ID:           uuid.NewV7(),
+		Username:     "viewer",
+		PasswordHash: "hashed-password",
+		Role:         RoleViewer,
+	}
+
+	if err := store.Insert(account); err != nil {
+		t.Fatalf("Insert() error = %v", err)
+	}
+
+	if err := store.SetRole(account.ID, RoleAdmin); err != nil {
+		t.Fatalf("SetRole(%v, %q) error = %v", account.ID, RoleAdmin, err)
+	}
+
+	got, err := store.ByID(account.ID)
+	if err != nil {
+		t.Fatalf("ByID(%v) error = %v", account.ID, err)
+	}
+
+	if got.Role != RoleAdmin {
+		t.Errorf("Role = %q, want %q", got.Role, RoleAdmin)
+	}
+}
+
+func TestStore_SetRoleNotFound(t *testing.T) {
+	id := uuid.NewV7()
+	store := newTestStore(t)
+
+	err := store.SetRole(id, RoleAdmin)
+
+	if !errors.Is(err, ErrUserNotFound) {
+		t.Errorf("SetRole(%v, %q) error = %v, want ErrUserNotFound", id, RoleAdmin, err)
+	}
+}
+
 // helper
 
 func newTestStore(t *testing.T) *Store {
