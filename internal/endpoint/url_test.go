@@ -88,7 +88,7 @@ func TestParseURL(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				parsedURL, err := ParseURL(tt.rawURL)
 				if err != nil {
-					t.Fatalf("ParseURL(%q) returned unexpected error: %v", tt.rawURL, err)
+					t.Fatalf("ParseURL(%q) error = %v, want nil", tt.rawURL, err)
 				}
 
 				if got := parsedURL.String(); got != tt.want {

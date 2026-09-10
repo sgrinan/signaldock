@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Repository persists endpoint configuration in PostgreSQL.
+// Repository persists endpoint identity and URL in PostgreSQL.
 type Repository struct {
 	pool *pgxpool.Pool
 }
@@ -24,7 +24,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
-// Insert persists an endpoint.
+// Insert persists an endpoint's identity and URL.
 func (r *Repository) Insert(endpoint Endpoint) error {
 	const query = `
 		INSERT INTO endpoints (id, url)
@@ -44,7 +44,7 @@ func (r *Repository) Insert(endpoint Endpoint) error {
 	return nil
 }
 
-// List returns all persisted endpoints.
+// List returns all persisted endpoint configurations.
 func (r *Repository) List() ([]Endpoint, error) {
 	const query = `
 		SELECT id::text, url
@@ -85,7 +85,7 @@ func (r *Repository) List() ([]Endpoint, error) {
 	return endpoints, nil
 }
 
-// ByID returns the persisted endpoint with the given ID.
+// ByID returns the persisted endpoint configuration with the given ID.
 func (r *Repository) ByID(id uuid.UUID) (Endpoint, error) {
 	const query = `
 		SELECT id::text, url

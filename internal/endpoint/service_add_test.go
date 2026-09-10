@@ -21,7 +21,7 @@ func TestService_Add(t *testing.T) {
 
 		got, err := s.Add("HTTPS://EXAMPLE.COM:443")
 		if err != nil {
-			t.Fatalf("Add() returned unexpected error: %v", err)
+			t.Fatalf("Add() error = %v, want nil", err)
 		}
 
 		if got.ID == uuid.Nil() {
@@ -78,7 +78,7 @@ func TestService_Add(t *testing.T) {
 
 		endpoints, err := repository.List()
 		if err != nil {
-			t.Fatalf("List() returned unexpected error: %v", err)
+			t.Fatalf("List() error = %v, want nil", err)
 		}
 
 		if got := len(endpoints); got != 0 {
@@ -107,7 +107,7 @@ func TestService_Add(t *testing.T) {
 
 		endpoints, err := repository.List()
 		if err != nil {
-			t.Fatalf("List() returned unexpected error: %v", err)
+			t.Fatalf("List() error = %v, want nil", err)
 		}
 
 		if got := len(endpoints); got != 0 {
@@ -224,7 +224,7 @@ func TestService_Add(t *testing.T) {
 
 		first, err := s.Add(rawURL)
 		if err != nil {
-			t.Fatalf("first Add(%q) returned unexpected error: %v", rawURL, err)
+			t.Fatalf("first Add(%q) error = %v, want nil", rawURL, err)
 		}
 
 		_, err = s.Add(rawURL)
@@ -234,7 +234,7 @@ func TestService_Add(t *testing.T) {
 
 		endpoints, err := repository.List()
 		if err != nil {
-			t.Fatalf("List() returned unexpected error: %v", err)
+			t.Fatalf("List() error = %v, want nil", err)
 		}
 
 		if got := len(endpoints); got != 1 {
@@ -320,7 +320,7 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 			duplicates++
 
 		default:
-			t.Errorf("Add() returned unexpected error: %v", err)
+			t.Errorf("Add(%v) error = %v, want nil or %v", "https://example.com/", err, ErrEndpointExists)
 		}
 	}
 
@@ -334,7 +334,7 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 
 	endpoints, err := repository.List()
 	if err != nil {
-		t.Fatalf("List() returned unexpected error: %v", err)
+		t.Fatalf("List() error = %v, want nil", err)
 	}
 
 	if got, want := len(endpoints), 1; got != want {

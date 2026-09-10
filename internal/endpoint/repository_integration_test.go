@@ -1,7 +1,6 @@
 package endpoint
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"os"
@@ -19,12 +18,12 @@ func TestRepository_Insert(t *testing.T) {
 		ep := testEndpoint("https://example.com/")
 
 		if err := repository.Insert(ep); err != nil {
-			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
+			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
 		got, err := repository.ByID(ep.ID)
 		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", ep.ID, err)
+			t.Fatalf("ByID(%v) error = %v, want nil", ep.ID, err)
 		}
 
 		if got != ep {
@@ -39,7 +38,7 @@ func TestRepository_Insert(t *testing.T) {
 		second := testEndpoint("https://example.com/")
 
 		if err := repository.Insert(first); err != nil {
-			t.Fatalf("Insert(%+v) returned unexpected error: %v", first, err)
+			t.Fatalf("Insert(%+v) error = %v, want nil", first, err)
 		}
 
 		err := repository.Insert(second)
@@ -49,7 +48,7 @@ func TestRepository_Insert(t *testing.T) {
 
 		endpoints, err := repository.List()
 		if err != nil {
-			t.Fatalf("List() returned unexpected error: %v", err)
+			t.Fatalf("List() error = %v, want nil", err)
 		}
 
 		if got, want := len(endpoints), 1; got != want {
@@ -119,7 +118,7 @@ func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
 			duplicates++
 
 		default:
-			t.Errorf("Insert() returned unexpected error: %v", err)
+			t.Errorf("Insert(%q) error = %v, want nil or %v", "https://example.com/", err, ErrEndpointExists)
 		}
 	}
 
@@ -133,7 +132,7 @@ func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
 
 	endpoints, err := repository.List()
 	if err != nil {
-		t.Fatalf("List() returned unexpected error: %v", err)
+		t.Fatalf("List() error = %v, want nil", err)
 	}
 
 	if got, want := len(endpoints), 1; got != want {
@@ -148,16 +147,16 @@ func TestRepository_List(t *testing.T) {
 	second := testEndpoint("https://example.org/")
 
 	if err := repository.Insert(first); err != nil {
-		t.Fatalf("Insert(%+v) returned unexpected error: %v", first, err)
+		t.Fatalf("Insert(%+v) error = %v, want nil", first, err)
 	}
 
 	if err := repository.Insert(second); err != nil {
-		t.Fatalf("Insert(%+v) returned unexpected error: %v", second, err)
+		t.Fatalf("Insert(%+v) error = %v, want nil", second, err)
 	}
 
 	got, err := repository.List()
 	if err != nil {
-		t.Fatalf("List() returned unexpected error: %v", err)
+		t.Fatalf("List() error = %v, want nil", err)
 	}
 
 	if gotLen, wantLen := len(got), 2; gotLen != wantLen {
@@ -185,13 +184,13 @@ func TestRepository_ByID(t *testing.T) {
 	ep := testEndpoint("https://example.com/")
 
 	if err := repository.Insert(ep); err != nil {
-		t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
+		t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 	}
 
 	t.Run("found", func(t *testing.T) {
 		got, err := repository.ByID(ep.ID)
 		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", ep.ID, err)
+			t.Fatalf("ByID(%v) error = %v, want nil", ep.ID, err)
 		}
 
 		if got != ep {
@@ -214,11 +213,11 @@ func TestRepository_RemoveByID(t *testing.T) {
 		ep := testEndpoint("https://example.com/")
 
 		if err := repository.Insert(ep); err != nil {
-			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
+			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
 		if err := repository.RemoveByID(ep.ID); err != nil {
-			t.Fatalf("RemoveByID(%v) returned unexpected error: %v", ep.ID, err)
+			t.Fatalf("RemoveByID(%v) error = %v, want nil", ep.ID, err)
 		}
 
 		if _, err := repository.ByID(ep.ID); !errors.Is(err, ErrEndpointNotFound) {
@@ -238,13 +237,6 @@ func TestRepository_RemoveByID(t *testing.T) {
 
 // Test helpers
 
-func testEndpoint(rawURL string) Endpoint {
-	return Endpoint{
-		ID:  uuid.NewV7(),
-		URL: rawURL,
-	}
-}
-
 func newTestRepository(t *testing.T) *Repository {
 	t.Helper()
 
@@ -253,21 +245,21 @@ func newTestRepository(t *testing.T) *Repository {
 		t.Fatal("SIGNALDOCK_TEST_DATABASE_URL is required")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	pool, err := database.NewPostgresPool(ctx, databaseURL)
 	if err != nil {
-		t.Fatalf("NewPostgresPool() error = %v", err)
+		t.Fatalf("NewPostgresPool() error = %v, want nil", err)
 	}
 
 	t.Cleanup(pool.Close)
 
 	if err := database.ApplyMigrations(ctx, pool); err != nil {
-		t.Fatalf("ApplyMigrations() error = %v", err)
+		t.Fatalf("ApplyMigrations() error = %v, want nil", err)
 	}
 
 	if _, err := pool.Exec(ctx, `TRUNCATE TABLE endpoints`); err != nil {
-		t.Fatalf("TRUNCATE endpoints error = %v", err)
+		t.Fatalf("TRUNCATE endpoints error = %v, want nil", err)
 	}
 
 	return NewRepository(pool)

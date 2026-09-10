@@ -19,7 +19,7 @@ func TestService_Refresh(t *testing.T) {
 		ep := testEndpoint("https://example.com/")
 
 		if err := repository.Insert(ep); err != nil {
-			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
+			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
 		want := CheckResult{
@@ -43,7 +43,7 @@ func TestService_Refresh(t *testing.T) {
 
 		got, err := s.Refresh(ep.ID)
 		if err != nil {
-			t.Fatalf("Refresh(%v) returned unexpected error: %v", ep.ID, err)
+			t.Fatalf("Refresh(%v) error = %v, want nil", ep.ID, err)
 		}
 
 		if got != want {
@@ -157,12 +157,7 @@ func TestService_Refresh(t *testing.T) {
 		}
 
 		if got.HTTP != wantHTTP {
-			t.Errorf(
-				"Refresh(%v).HTTP = %+v, want %+v",
-				ep.ID,
-				got.HTTP,
-				wantHTTP,
-			)
+			t.Errorf("Refresh(%v).HTTP = %+v, want %+v", ep.ID, got.HTTP, wantHTTP)
 		}
 
 		stored := checks.Get(ep.ID)

@@ -151,7 +151,7 @@ func (s *Service) ByID(id uuid.UUID) (Endpoint, error) {
 	return ep, nil
 }
 
-// RemoveByID removes the endpoint with the given ID.
+// RemoveByID removes the endpoint configuration and its latest check result.
 func (s *Service) RemoveByID(id uuid.UUID) error {
 	if err := s.repository.RemoveByID(id); err != nil {
 		return err

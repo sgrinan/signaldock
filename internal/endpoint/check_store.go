@@ -19,6 +19,7 @@ func NewCheckStore() *CheckStore {
 	}
 }
 
+// Set stores the latest check result for id.
 func (s *CheckStore) Set(id uuid.UUID, result CheckResult) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -26,6 +27,8 @@ func (s *CheckStore) Set(id uuid.UUID, result CheckResult) {
 	s.results[id] = result
 }
 
+// Get returns the latest check result for id.
+// It returns a zero CheckResult when no result is stored.
 func (s *CheckStore) Get(id uuid.UUID) CheckResult {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -33,6 +36,7 @@ func (s *CheckStore) Get(id uuid.UUID) CheckResult {
 	return s.results[id]
 }
 
+// Delete removes the latest check result for id.
 func (s *CheckStore) Delete(id uuid.UUID) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
