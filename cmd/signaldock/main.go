@@ -64,8 +64,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	store := endpoint.NewStore(pool)
-	service := endpoint.NewService(store)
+	endpointStore := endpoint.NewStore(pool)
+	endpointService := endpoint.NewService(endpointStore)
 
 	userStore := user.NewStore(pool)
 
@@ -102,19 +102,19 @@ func main() {
 	sessionStore := session.NewStore(pool)
 	sessionService := session.NewService(sessionStore)
 
-	endpoints, err := service.List()
+	endpoints, err := endpointService.List()
 	if err != nil {
 		logger.Error("failed to load endpoints", "error", err)
 		os.Exit(1)
 	}
 
 	for _, ep := range endpoints {
-		if _, err := service.Refresh(ep.ID); err != nil {
+		if _, err := endpointService.Refresh(ep.ID); err != nil {
 			logger.Warn("failed to refresh endpoint on startup", "endpoint_id", ep.ID, "url", ep.URL, "error", err)
 		}
 	}
 
-	handler, err := web.NewHandler(service, userStore, sessionService, logger)
+	handler, err := web.NewHandler(endpointService, userStore, sessionService, logger)
 	if err != nil {
 		logger.Error("failed to create HTTP handler", "error", err)
 		os.Exit(1)

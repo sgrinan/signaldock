@@ -13,7 +13,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Store keeps endpoints in memory.
+// Store persists endpoint configuration in PostgreSQL and keeps
+// the latest check results in memory.
 type Store struct {
 	pool *pgxpool.Pool
 
@@ -21,7 +22,7 @@ type Store struct {
 	lastChecks map[uuid.UUID]CheckResult
 }
 
-// NewStore returns an empty Store.
+// NewStore returns a Store backed by pool.
 func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{
 		pool:       pool,
