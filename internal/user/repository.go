@@ -12,23 +12,26 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Store struct {
+// Repository persists users in PostgreSQL.
+type Repository struct {
 	pool *pgxpool.Pool
 }
 
-func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{
+// NewRepository returns a Repository backed by pool.
+func NewRepository(pool *pgxpool.Pool) *Repository {
+	return &Repository{
 		pool: pool,
 	}
 }
 
-func (s *Store) Insert(user User) error {
+// Insert persists a user.
+func (r *Repository) Insert(user User) error {
 	const query = `
 		INSERT INTO users (id, username, password_hash, role, disabled)
 		VALUES ($1, $2, $3, $4, $5)
 	`
 
-	_, err := s.pool.Exec(context.Background(), query, user.ID, user.Username, user.PasswordHash, user.Role, user.Disabled)
+	_, err := r.pool.Exec(context.Background(), query, user.ID, user.Username, user.PasswordHash, user.Role, user.Disabled)
 	if err != nil {
 		var pgErr *pgconn.PgError
 
@@ -42,14 +45,15 @@ func (s *Store) Insert(user User) error {
 	return nil
 }
 
-func (s *Store) List() ([]User, error) {
+// List returns all persisted users.
+func (r *Repository) List() ([]User, error) {
 	const query = `
 		SELECT id::text, username, password_hash, role, disabled, created_at
 		FROM users
 		ORDER BY created_at, id
 	`
 
-	rows, err := s.pool.Query(context.Background(), query)
+	rows, err := r.pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
@@ -82,7 +86,8 @@ func (s *Store) List() ([]User, error) {
 	return users, nil
 }
 
-func (s *Store) ByUsername(username string) (User, error) {
+// ByUsername returns the user with the given username.
+func (r *Repository) ByUsername(username string) (User, error) {
 	const query = `
 		SELECT id::text, username, password_hash, role, disabled, created_at
 		FROM users
@@ -94,7 +99,7 @@ func (s *Store) ByUsername(username string) (User, error) {
 		rawID string
 	)
 
-	err := s.pool.QueryRow(context.Background(), query, username).Scan(&rawID, &user.Username, &user.PasswordHash, &user.Role, &user.Disabled, &user.CreatedAt)
+	err := r.pool.QueryRow(context.Background(), query, username).Scan(&rawID, &user.Username, &user.PasswordHash, &user.Role, &user.Disabled, &user.CreatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrUserNotFound
@@ -112,7 +117,8 @@ func (s *Store) ByUsername(username string) (User, error) {
 	return user, nil
 }
 
-func (s *Store) ByID(id uuid.UUID) (User, error) {
+// ByID returns the user with the given ID.
+func (r *Repository) ByID(id uuid.UUID) (User, error) {
 	const query = `
 		SELECT id::text, username, password_hash, role, disabled, created_at
 		FROM users
@@ -124,7 +130,7 @@ func (s *Store) ByID(id uuid.UUID) (User, error) {
 		rawID string
 	)
 
-	err := s.pool.QueryRow(context.Background(), query, id).Scan(&rawID, &user.Username, &user.PasswordHash, &user.Role, &user.Disabled, &user.CreatedAt)
+	err := r.pool.QueryRow(context.Background(), query, id).Scan(&rawID, &user.Username, &user.PasswordHash, &user.Role, &user.Disabled, &user.CreatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrUserNotFound
@@ -142,14 +148,15 @@ func (s *Store) ByID(id uuid.UUID) (User, error) {
 	return user, nil
 }
 
-func (s *Store) SetDisabled(id uuid.UUID, disabled bool) error {
+// SetDisabled updates whether a user account is disabled.
+func (r *Repository) SetDisabled(id uuid.UUID, disabled bool) error {
 	const query = `
 		UPDATE users
 		SET disabled = $2
 		WHERE id = $1
 	`
 
-	result, err := s.pool.Exec(context.Background(), query, id, disabled)
+	result, err := r.pool.Exec(context.Background(), query, id, disabled)
 	if err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}
@@ -161,14 +168,15 @@ func (s *Store) SetDisabled(id uuid.UUID, disabled bool) error {
 	return nil
 }
 
-func (s *Store) SetRole(id uuid.UUID, role Role) error {
+// SetRole updates the authorization role of a user.
+func (r *Repository) SetRole(id uuid.UUID, role Role) error {
 	const query = `
 		UPDATE users
 		SET role = $2
 		WHERE id = $1
 	`
 
-	result, err := s.pool.Exec(context.Background(), query, id, role)
+	result, err := r.pool.Exec(context.Background(), query, id, role)
 	if err != nil {
 		return fmt.Errorf("update user role: %w", err)
 	}
@@ -180,13 +188,14 @@ func (s *Store) SetRole(id uuid.UUID, role Role) error {
 	return nil
 }
 
-func (s *Store) RemoveByID(id uuid.UUID) error {
+// RemoveByID deletes the user with the given ID.
+func (r *Repository) RemoveByID(id uuid.UUID) error {
 	const query = `
 		DELETE FROM users
 		WHERE id = $1
 	`
 
-	result, err := s.pool.Exec(context.Background(), query, id)
+	result, err := r.pool.Exec(context.Background(), query, id)
 	if err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}

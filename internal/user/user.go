@@ -6,6 +6,7 @@ import (
 	"uuid"
 )
 
+// Role identifies a user's authorization level.
 type Role string
 
 const (
@@ -13,6 +14,7 @@ const (
 	RoleViewer Role = "viewer"
 )
 
+// User represents a SignalDock account.
 type User struct {
 	ID           uuid.UUID
 	Username     string

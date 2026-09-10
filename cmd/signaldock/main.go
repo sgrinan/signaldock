@@ -68,9 +68,9 @@ func main() {
 	endpointChecks := endpoint.NewCheckStore()
 	endpointService := endpoint.NewService(endpointRepository, endpointChecks)
 
-	userStore := user.NewStore(pool)
+	userRepository := user.NewRepository(pool)
 
-	users, err := userStore.List()
+	users, err := userRepository.List()
 	if err != nil {
 		logger.Error("failed to load users", "error", err)
 		os.Exit(1)
@@ -92,7 +92,7 @@ func main() {
 			Role:         user.RoleAdmin,
 		}
 
-		if err := userStore.Insert(admin); err != nil {
+		if err := userRepository.Insert(admin); err != nil {
 			logger.Error("failed to create initial admin", "error", err)
 			os.Exit(1)
 		}
@@ -115,7 +115,7 @@ func main() {
 		}
 	}
 
-	handler, err := web.NewHandler(endpointService, userStore, sessionService, logger)
+	handler, err := web.NewHandler(endpointService, userRepository, sessionService, logger)
 	if err != nil {
 		logger.Error("failed to create HTTP handler", "error", err)
 		os.Exit(1)
