@@ -3,6 +3,7 @@ package endpoint
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"sync"
 	"testing"
@@ -53,6 +54,29 @@ func TestRepository_Insert(t *testing.T) {
 
 		if got, want := len(endpoints), 1; got != want {
 			t.Errorf("len(List()) = %d, want %d", got, want)
+		}
+	})
+	t.Run("does_not_persist_last_check", func(t *testing.T) {
+		repository := newTestRepository(t)
+
+		ep := testEndpoint("https://example.com/")
+
+		ep.LastCheck.HTTP.StatusCode = http.StatusOK
+		ep.LastCheck.HTTP.Responded = true
+		ep.LastCheck.TLS.Enabled = true
+		ep.LastCheck.TLS.Valid = true
+
+		if err := repository.Insert(ep); err != nil {
+			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
+		}
+
+		got, err := repository.ByID(ep.ID)
+		if err != nil {
+			t.Fatalf("ByID(%v) error = %v, want nil", ep.ID, err)
+		}
+
+		if got.LastCheck != (CheckResult{}) {
+			t.Errorf("ByID(%v).LastCheck = %+v, want zero CheckResult", ep.ID, got.LastCheck)
 		}
 	})
 }
@@ -146,13 +170,13 @@ func TestRepository_List(t *testing.T) {
 
 	got[0].URL = "https://modified.example/"
 
-	repositoryd, err := repository.ByID(first.ID)
+	stored, err := repository.ByID(first.ID)
 	if err != nil {
-		t.Fatalf("ByID(%v) returned unexpected error: %v", first.ID, err)
+		t.Fatalf("ByID(%v) error = %v, want nil", first.ID, err)
 	}
 
-	if repositoryd.URL != first.URL {
-		t.Errorf("ByID(%v).URL = %q, want %q", first.ID, repositoryd.URL, first.URL)
+	if stored.URL != first.URL {
+		t.Errorf("ByID(%v).URL = %q, want %q", first.ID, stored.URL, first.URL)
 	}
 }
 
