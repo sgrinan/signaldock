@@ -56,14 +56,16 @@ func NewHandler(endpoints endpointService, users userStore, sessions sessionServ
 
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
-	mux.HandleFunc("GET /{$}", h.handleGetIndex)
+	mux.Handle("GET /{$}", h.requireAuth(http.HandlerFunc(h.handleGetIndex)))
+	mux.Handle("GET /endpoints/{id}", h.requireAuth(http.HandlerFunc(h.handleGetEndpoint)))
+
+	mux.Handle("POST /endpoints", h.requireAuth(http.HandlerFunc(h.handlePostEndpoint)))
+	mux.Handle("POST /endpoints/{id}/delete", h.requireAuth(http.HandlerFunc(h.handleDeleteEndpoint)))
+	mux.Handle("POST /endpoints/{id}/refresh", h.requireAuth(http.HandlerFunc(h.handleRefreshEndpoint)))
+	mux.Handle("POST /logout", h.requireAuth(http.HandlerFunc(h.handlePostLogout)))
+
 	mux.HandleFunc("GET /login", h.handleGetLogin)
 	mux.HandleFunc("POST /login", h.handlePostLogin)
-	mux.HandleFunc("POST /logout", h.handlePostLogout)
-	mux.HandleFunc("POST /endpoints", h.handlePostEndpoint)
-	mux.HandleFunc("GET /endpoints/{id}", h.handleGetEndpoint)
-	mux.HandleFunc("POST /endpoints/{id}/delete", h.handleDeleteEndpoint)
-	mux.HandleFunc("POST /endpoints/{id}/refresh", h.handleRefreshEndpoint)
 
 	mux.HandleFunc("GET /api/prometheus/targets", h.handlePrometheusTargets)
 

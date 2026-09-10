@@ -11,6 +11,10 @@ import (
 
 const sessionCookieName = "signaldock_session"
 
+type contextKey string
+
+const currentUserKey contextKey = "current-user"
+
 type userStore interface {
 	ByUsername(string) (user.User, error)
 	ByID(uuid.UUID) (user.User, error)
@@ -46,4 +50,10 @@ func clearSessionCookie(w http.ResponseWriter) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
+}
+
+func currentUser(r *http.Request) (user.User, bool) {
+	account, ok := r.Context().Value(currentUserKey).(user.User)
+
+	return account, ok
 }
