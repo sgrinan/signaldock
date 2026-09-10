@@ -179,3 +179,21 @@ func (s *Store) SetRole(id uuid.UUID, role Role) error {
 
 	return nil
 }
+
+func (s *Store) RemoveByID(id uuid.UUID) error {
+	const query = `
+		DELETE FROM users
+		WHERE id = $1
+	`
+
+	result, err := s.pool.Exec(context.Background(), query, id)
+	if err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}

@@ -28,9 +28,12 @@ func (h *handler) handleGetIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	account, _ := currentUser(r)
+
 	data := pageData{
-		Endpoints: newEndpointListItems(endpoints),
-		CSRFToken: csrfToken,
+		Endpoints:   newEndpointListItems(endpoints),
+		CSRFToken:   csrfToken,
+		CurrentUser: account,
 	}
 
 	switch result {
@@ -175,9 +178,12 @@ func (h *handler) handleGetEndpoint(w http.ResponseWriter, r *http.Request) {
 		tlsDaysClass = tlsExpiryClass(ep.LastCheck.TLS.DaysRemaining)
 	}
 
+	account, _ := currentUser(r)
+
 	data := endpointPageData{
 		Endpoint:      ep,
 		CSRFToken:     csrfToken,
+		CurrentUser:   account,
 		LatencyMS:     ep.LastCheck.HTTP.Latency.Milliseconds(),
 		LastCheckedAt: ep.LastCheck.HTTP.CheckedAt,
 		TLSExpiresAt:  tlsExpiresAt,

@@ -393,6 +393,41 @@ func TestStore_SetRoleNotFound(t *testing.T) {
 	}
 }
 
+func TestStore_RemoveByID(t *testing.T) {
+	store := newTestStore(t)
+
+	account := User{
+		ID:           uuid.NewV7(),
+		Username:     "viewer",
+		PasswordHash: "hashed-password",
+		Role:         RoleViewer,
+	}
+
+	if err := store.Insert(account); err != nil {
+		t.Fatalf("Insert() error = %v", err)
+	}
+
+	if err := store.RemoveByID(account.ID); err != nil {
+		t.Fatalf("RemoveByID(%v) error = %v", account.ID, err)
+	}
+
+	_, err := store.ByID(account.ID)
+	if !errors.Is(err, ErrUserNotFound) {
+		t.Errorf("ByID(%v) error = %v, want ErrUserNotFound", account.ID, err)
+	}
+}
+
+func TestStore_RemoveByIDNotFound(t *testing.T) {
+	store := newTestStore(t)
+	id := uuid.NewV7()
+
+	err := store.RemoveByID(id)
+
+	if !errors.Is(err, ErrUserNotFound) {
+		t.Errorf("RemoveByID(%v) error = %v, want ErrUserNotFound", id, err)
+	}
+}
+
 // helper
 
 func newTestStore(t *testing.T) *Store {

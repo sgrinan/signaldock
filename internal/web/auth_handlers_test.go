@@ -22,6 +22,7 @@ type fakeUserStore struct {
 	byIDFunc        func(uuid.UUID) (user.User, error)
 	setDisabledFunc func(uuid.UUID, bool) error
 	setRoleFunc     func(uuid.UUID, user.Role) error
+	removeByIDFunc  func(uuid.UUID) error
 }
 
 func (f *fakeUserStore) Insert(account user.User) error {
@@ -67,6 +68,14 @@ func (f *fakeUserStore) SetDisabled(id uuid.UUID, disabled bool) error {
 func (f *fakeUserStore) SetRole(id uuid.UUID, role user.Role) error {
 	if f.setRoleFunc != nil {
 		return f.setRoleFunc(id, role)
+	}
+
+	return nil
+}
+
+func (f *fakeUserStore) RemoveByID(id uuid.UUID) error {
+	if f.removeByIDFunc != nil {
+		return f.removeByIDFunc(id)
 	}
 
 	return nil

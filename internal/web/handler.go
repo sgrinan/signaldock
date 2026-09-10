@@ -55,18 +55,23 @@ func NewHandler(endpoints endpointService, users userStore, sessions sessionServ
 	mux := http.NewServeMux()
 
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
-
 	mux.Handle("GET /{$}", h.requireAuth(http.HandlerFunc(h.handleGetIndex)))
-	mux.Handle("GET /endpoints/{id}", h.requireAuth(http.HandlerFunc(h.handleGetEndpoint)))
-	mux.Handle("GET /users", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleGetUsers))))
-
-	mux.Handle("POST /endpoints", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handlePostEndpoint))))
-	mux.Handle("POST /endpoints/{id}/delete", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleDeleteEndpoint))))
-	mux.Handle("POST /endpoints/{id}/refresh", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleRefreshEndpoint))))
-	mux.Handle("POST /logout", h.requireAuth(http.HandlerFunc(h.handlePostLogout)))
 
 	mux.HandleFunc("GET /login", h.handleGetLogin)
 	mux.HandleFunc("POST /login", h.handlePostLogin)
+	mux.Handle("POST /logout", h.requireAuth(http.HandlerFunc(h.handlePostLogout)))
+
+	mux.Handle("GET /endpoints/{id}", h.requireAuth(http.HandlerFunc(h.handleGetEndpoint)))
+	mux.Handle("POST /endpoints", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handlePostEndpoint))))
+	mux.Handle("POST /endpoints/{id}/delete", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleDeleteEndpoint))))
+	mux.Handle("POST /endpoints/{id}/refresh", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleRefreshEndpoint))))
+
+	mux.Handle("GET /users", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleGetUsers))))
+	mux.Handle("POST /users", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handlePostUser))))
+	mux.Handle("POST /users/{id}/disable", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleDisableUser))))
+	mux.Handle("POST /users/{id}/enable", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleEnableUser))))
+	mux.Handle("POST /users/{id}/delete", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleDeleteUser))))
+	mux.Handle("POST /users/{id}", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleUpdateUser))))
 
 	mux.HandleFunc("GET /api/prometheus/targets", h.handlePrometheusTargets)
 

@@ -20,7 +20,18 @@
             <a class="brand" href="/">SignalDock</a>
 
             <div class="header-actions">
-                <span class="header-label">Endpoint monitoring</span>
+                <span class="header-label">
+                    {{ .CurrentUser.Username }} · {{ .CurrentUser.Role }}
+                </span>
+
+                {{ if eq .CurrentUser.Role "admin" }}
+                    <a
+                        class="button button-secondary"
+                        href="/users"
+                    >
+                        Users
+                    </a>
+                {{ end }}
 
                 <form method="POST" action="/logout">
                     <input
@@ -69,23 +80,31 @@
                 </p>
             </div>
 
-            <form
-                method="POST"
-                action="/endpoints/{{ .Endpoint.ID }}/refresh"
-            >
-                <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="{{ .CSRFToken }}"
-                >
 
-                <button
-                    class="button-primary"
-                    type="submit"
+            <!-- Admin controls -->
+
+            {{ if eq .CurrentUser.Role "admin" }}
+
+                <form
+                    method="POST"
+                    action="/endpoints/{{ .Endpoint.ID }}/refresh"
                 >
-                    Check now
-                </button>
-            </form>
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ .CSRFToken }}"
+                    >
+
+                    <button
+                        class="button-primary"
+                        type="submit"
+                    >
+                        Check now
+                    </button>
+                </form>
+
+            {{ end }}
+
         </section>
 
 
@@ -120,13 +139,17 @@
                             </span>
 
                             {{ if .Endpoint.LastCheck.HTTP.Responded }}
+
                                 <span class="status-badge status-ok">
                                     Yes
                                 </span>
+
                             {{ else }}
+
                                 <span class="status-badge status-error">
                                     No
                                 </span>
+
                             {{ end }}
                         </div>
 
@@ -153,9 +176,13 @@
 
                             <strong class="detail-value">
                                 {{ if .Endpoint.LastCheck.HTTP.Responded }}
+
                                     {{ .LatencyMS }} ms
+
                                 {{ else }}
+
                                     —
+
                                 {{ end }}
                             </strong>
                         </div>
@@ -197,13 +224,17 @@
                             </span>
 
                             {{ if .Endpoint.LastCheck.TLS.Enabled }}
+
                                 <span class="status-badge status-ok">
                                     Yes
                                 </span>
+
                             {{ else }}
+
                                 <span class="status-badge status-pending">
                                     No
                                 </span>
+
                             {{ end }}
                         </div>
 
@@ -218,13 +249,17 @@
                                     </span>
 
                                     {{ if .Endpoint.LastCheck.TLS.Valid }}
+
                                         <span class="status-badge status-ok">
                                             Valid
                                         </span>
+
                                     {{ else }}
+
                                         <span class="status-badge status-error">
                                             Invalid
                                         </span>
+
                                     {{ end }}
                                 </div>
 
@@ -250,6 +285,7 @@
                                     </strong>
                                 </div>
 
+
                             {{ else }}
 
                                 <div class="detail-message">
@@ -257,6 +293,7 @@
                                 </div>
 
                             {{ end }}
+
 
                         {{ else }}
 
@@ -280,7 +317,10 @@
             <div class="section-heading">
                 <div>
                     <h2>Monitoring</h2>
-                    <p>Historical metrics will appear here.</p>
+
+                    <p>
+                        Historical metrics will appear here.
+                    </p>
                 </div>
             </div>
 
@@ -290,32 +330,39 @@
         </section>
 
 
-        <!-- Danger zone -->
+        <!-- Admin danger zone -->
 
-        <section class="danger-zone">
-            <div>
-                <h2>Danger zone</h2>
-                <p>Remove this endpoint from SignalDock.</p>
-            </div>
+        {{ if eq .CurrentUser.Role "admin" }}
 
-            <form
-                method="POST"
-                action="/endpoints/{{ .Endpoint.ID }}/delete"
-            >
-                <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="{{ .CSRFToken }}"
+            <section class="danger-zone">
+                <div>
+                    <h2>Danger zone</h2>
+
+                    <p>
+                        Remove this endpoint from SignalDock.
+                    </p>
+                </div>
+
+                <form
+                    method="POST"
+                    action="/endpoints/{{ .Endpoint.ID }}/delete"
                 >
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ .CSRFToken }}"
+                    >
 
-                <button
-                    class="button-danger"
-                    type="submit"
-                >
-                    Remove endpoint
-                </button>
-            </form>
-        </section>
+                    <button
+                        class="button-danger"
+                        type="submit"
+                    >
+                        Remove endpoint
+                    </button>
+                </form>
+            </section>
+
+        {{ end }}
 
     </main>
 

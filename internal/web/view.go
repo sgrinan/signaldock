@@ -8,6 +8,7 @@ import (
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/endpoint"
+	"github.com/sgrinan/signaldock/internal/user"
 )
 
 type endpointListItem struct {
@@ -24,14 +25,16 @@ type endpointListItem struct {
 }
 
 type pageData struct {
-	Endpoints []endpointListItem
-	Error     string
-	CSRFToken string
+	Endpoints   []endpointListItem
+	Error       string
+	CSRFToken   string
+	CurrentUser user.User
 }
 
 type endpointPageData struct {
 	Endpoint      endpoint.Endpoint
 	CSRFToken     string
+	CurrentUser   user.User
 	LatencyMS     int64
 	LastCheckedAt time.Time
 	TLSExpiresAt  string

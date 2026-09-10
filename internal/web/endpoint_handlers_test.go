@@ -709,6 +709,12 @@ func newTestHandler(service endpointService) *handler {
 		),
 	)
 
+	template.Must(
+		tmpl.New("users.html").Parse(
+			`{{.Error}}|{{len .Users}}|{{if .CSRFToken}}csrf{{end}}`,
+		),
+	)
+
 	return &handler{
 		endpoints: service,
 		users:     &fakeUserStore{},

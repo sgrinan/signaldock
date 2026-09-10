@@ -20,7 +20,18 @@
             <a class="brand" href="/">SignalDock</a>
 
             <div class="header-actions">
-                <span class="header-label">Endpoint monitoring</span>
+                <span class="header-label">
+                    {{ .CurrentUser.Username }} · {{ .CurrentUser.Role }}
+                </span>
+
+                {{ if eq .CurrentUser.Role "admin" }}
+                    <a
+                        class="button button-secondary"
+                        href="/users"
+                    >
+                        Users
+                    </a>
+                {{ end }}
 
                 <form method="POST" action="/logout">
                     <input
@@ -45,65 +56,87 @@
 
     <main class="container">
 
-
-        <!-- Add endpoint -->
+        <!-- Endpoint heading and creation -->
 
         <section class="add-endpoint">
+
             <div class="section-heading">
                 <div>
                     <h1>Endpoints</h1>
-                    <p>Monitor HTTP availability, latency and TLS certificates.</p>
+
+                    <p>
+                        Monitor HTTP availability, latency and TLS certificates.
+                    </p>
                 </div>
             </div>
 
-            <form class="add-form" method="POST" action="/endpoints">
-                <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="{{ .CSRFToken }}"
+
+            <!-- Admin controls -->
+
+            {{ if eq .CurrentUser.Role "admin" }}
+
+                <form
+                    class="add-form"
+                    method="POST"
+                    action="/endpoints"
                 >
-
-                <div class="form-field">
-                    <label for="url">Endpoint URL</label>
-
-                    <div class="form-row">
-                        <input
-                            type="url"
-                            id="url"
-                            name="url"
-                            placeholder="https://www.example.com"
-                            required
-                        >
-
-                        <button type="submit">
-                            Add endpoint
-                        </button>
-                    </div>
-                </div>
-            </form>
-
-
-            <!-- Alert -->
-
-            {{ if .Error }}
-                <div class="alert" role="alert">
-                    <span>{{ .Error }}</span>
-
-                    <a
-                        class="alert-close"
-                        href="/"
-                        aria-label="Dismiss notification"
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ .CSRFToken }}"
                     >
-                        &times;
-                    </a>
-                </div>
+
+                    <div class="form-field">
+                        <label for="url">
+                            Endpoint URL
+                        </label>
+
+                        <div class="form-row">
+                            <input
+                                type="url"
+                                id="url"
+                                name="url"
+                                placeholder="https://www.example.com"
+                                required
+                            >
+
+                            <button type="submit">
+                                Add endpoint
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+
+                <!-- Alert -->
+
+                {{ if .Error }}
+
+                    <div class="alert" role="alert">
+                        <span>
+                            {{ .Error }}
+                        </span>
+
+                        <a
+                            class="alert-close"
+                            href="/"
+                            aria-label="Dismiss notification"
+                        >
+                            &times;
+                        </a>
+                    </div>
+
+                {{ end }}
+
             {{ end }}
+
         </section>
 
 
         <!-- Endpoint list -->
 
         <section class="endpoint-list">
+
             <div class="section-heading">
                 <h2>Monitored endpoints</h2>
 
@@ -144,25 +177,51 @@
                             <div class="endpoint-summary">
 
                                 <span class="summary-item">
-                                    <span class="summary-label">HTTP</span>
-                                    <strong>{{ .HTTPStatus }}</strong>
+                                    <span class="summary-label">
+                                        HTTP
+                                    </span>
+
+                                    <strong>
+                                        {{ .HTTPStatus }}
+                                    </strong>
                                 </span>
 
-                                <span class="summary-item">
-                                    <span class="summary-label">Latency</span>
-                                    <strong>{{ .Latency }}</strong>
-                                </span>
 
                                 <span class="summary-item">
-                                    <span class="summary-label">TLS</span>
-                                    <strong>{{ .TLSState }}</strong>
+                                    <span class="summary-label">
+                                        Latency
+                                    </span>
+
+                                    <strong>
+                                        {{ .Latency }}
+                                    </strong>
                                 </span>
 
+
                                 <span class="summary-item">
-                                    <span class="summary-label">Last checked</span>
+                                    <span class="summary-label">
+                                        TLS
+                                    </span>
+
+                                    <strong>
+                                        {{ .TLSState }}
+                                    </strong>
+                                </span>
+
+
+                                <span class="summary-item">
+                                    <span class="summary-label">
+                                        Last checked
+                                    </span>
+
                                     {{ if .LastCheckedAt.IsZero }}
-                                        <strong>Not checked yet</strong>
+
+                                        <strong>
+                                            Not checked yet
+                                        </strong>
+
                                     {{ else }}
+
                                         <strong>
                                             <time
                                                 data-local-time
@@ -171,8 +230,10 @@
                                                 {{ .LastCheckedAt.Format "15:04:05" }}
                                             </time>
                                         </strong>
+
                                     {{ end }}
                                 </span>
+
 
                                 <a
                                     class="button button-secondary"
@@ -180,6 +241,7 @@
                                 >
                                     View
                                 </a>
+
                             </div>
 
                         </article>
@@ -195,7 +257,16 @@
 
                 <div class="empty-state">
                     <h3>No endpoints yet</h3>
-                    <p>Add your first endpoint to start monitoring it.</p>
+
+                    {{ if eq .CurrentUser.Role "admin" }}
+                        <p>
+                            Add your first endpoint to start monitoring it.
+                        </p>
+                    {{ else }}
+                        <p>
+                            No endpoints are currently being monitored.
+                        </p>
+                    {{ end }}
                 </div>
 
             {{ end }}

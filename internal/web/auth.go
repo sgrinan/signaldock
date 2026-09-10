@@ -22,6 +22,7 @@ type userStore interface {
 	ByID(uuid.UUID) (user.User, error)
 	SetDisabled(uuid.UUID, bool) error
 	SetRole(uuid.UUID, user.Role) error
+	RemoveByID(uuid.UUID) error
 }
 
 type sessionService interface {
