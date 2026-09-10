@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
 	"uuid"
 
@@ -13,33 +12,28 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Store persists endpoint configuration in PostgreSQL and keeps
-// the latest check results in memory.
-type Store struct {
+// Repository persists endpoint configuration in PostgreSQL.
+type Repository struct {
 	pool *pgxpool.Pool
-
-	mu         sync.RWMutex
-	lastChecks map[uuid.UUID]CheckResult
 }
 
-// NewStore returns a Store backed by pool.
-func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{
-		pool:       pool,
-		lastChecks: make(map[uuid.UUID]CheckResult),
+// NewRepository returns a Repository backed by pool.
+func NewRepository(pool *pgxpool.Pool) *Repository {
+	return &Repository{
+		pool: pool,
 	}
 }
 
-func (s *Store) Insert(endpoint Endpoint) error {
+// Insert persists an endpoint.
+func (r *Repository) Insert(endpoint Endpoint) error {
 	const query = `
 		INSERT INTO endpoints (id, url)
 		VALUES ($1, $2)
 	`
 
-	_, err := s.pool.Exec(context.Background(), query, endpoint.ID, endpoint.URL)
+	_, err := r.pool.Exec(context.Background(), query, endpoint.ID, endpoint.URL)
 	if err != nil {
 		var pgErr *pgconn.PgError
-
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return ErrEndpointExists
 		}
@@ -47,21 +41,18 @@ func (s *Store) Insert(endpoint Endpoint) error {
 		return fmt.Errorf("insert endpoint: %w", err)
 	}
 
-	s.mu.Lock()
-	s.lastChecks[endpoint.ID] = endpoint.LastCheck
-	s.mu.Unlock()
-
 	return nil
 }
 
-func (s *Store) List() ([]Endpoint, error) {
+// List returns all persisted endpoints.
+func (r *Repository) List() ([]Endpoint, error) {
 	const query = `
 		SELECT id::text, url
 		FROM endpoints
 		ORDER BY created_at, id
 	`
 
-	rows, err := s.pool.Query(context.Background(), query)
+	rows, err := r.pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, fmt.Errorf("list endpoints: %w", err)
 	}
@@ -84,10 +75,6 @@ func (s *Store) List() ([]Endpoint, error) {
 			return nil, fmt.Errorf("parse endpoint id: %w", err)
 		}
 
-		s.mu.RLock()
-		endpoint.LastCheck = s.lastChecks[endpoint.ID]
-		s.mu.RUnlock()
-
 		endpoints = append(endpoints, endpoint)
 	}
 
@@ -98,7 +85,8 @@ func (s *Store) List() ([]Endpoint, error) {
 	return endpoints, nil
 }
 
-func (s *Store) ByID(id uuid.UUID) (Endpoint, error) {
+// ByID returns the persisted endpoint with the given ID.
+func (r *Repository) ByID(id uuid.UUID) (Endpoint, error) {
 	const query = `
 		SELECT id::text, url
 		FROM endpoints
@@ -110,7 +98,7 @@ func (s *Store) ByID(id uuid.UUID) (Endpoint, error) {
 		rawID    string
 	)
 
-	err := s.pool.QueryRow(context.Background(), query, id).Scan(&rawID, &endpoint.URL)
+	err := r.pool.QueryRow(context.Background(), query, id).Scan(&rawID, &endpoint.URL)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Endpoint{}, ErrEndpointNotFound
@@ -125,20 +113,17 @@ func (s *Store) ByID(id uuid.UUID) (Endpoint, error) {
 		return Endpoint{}, fmt.Errorf("parse endpoint id: %w", err)
 	}
 
-	s.mu.RLock()
-	endpoint.LastCheck = s.lastChecks[endpoint.ID]
-	s.mu.RUnlock()
-
 	return endpoint, nil
 }
 
-func (s *Store) RemoveByID(id uuid.UUID) error {
+// RemoveByID removes the persisted endpoint with the given ID.
+func (r *Repository) RemoveByID(id uuid.UUID) error {
 	const query = `
 		DELETE FROM endpoints
 		WHERE id = $1
 	`
 
-	result, err := s.pool.Exec(context.Background(), query, id)
+	result, err := r.pool.Exec(context.Background(), query, id)
 	if err != nil {
 		return fmt.Errorf("remove endpoint: %w", err)
 	}
@@ -146,36 +131,6 @@ func (s *Store) RemoveByID(id uuid.UUID) error {
 	if result.RowsAffected() == 0 {
 		return ErrEndpointNotFound
 	}
-
-	s.mu.Lock()
-	delete(s.lastChecks, id)
-	s.mu.Unlock()
-
-	return nil
-}
-
-func (s *Store) UpdateLastCheck(id uuid.UUID, result CheckResult) error {
-	const query = `
-		SELECT 1
-		FROM endpoints
-		WHERE id = $1
-	`
-
-	var exists int
-
-	err := s.pool.QueryRow(context.Background(), query, id).Scan(&exists)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrEndpointNotFound
-	}
-
-	if err != nil {
-		return fmt.Errorf("check endpoint existence: %w", err)
-	}
-
-	s.mu.Lock()
-	s.lastChecks[id] = result
-	s.mu.Unlock()
 
 	return nil
 }

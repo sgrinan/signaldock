@@ -6,26 +6,22 @@ import (
 	"os"
 	"sync"
 	"testing"
-	"time"
 
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/database"
-	"github.com/sgrinan/signaldock/internal/probe"
 )
 
-// Store.Insert
-
-func TestStore_Insert(t *testing.T) {
+func TestRepository_Insert(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		store := newTestStore(t)
+		repository := newTestRepository(t)
 		ep := testEndpoint("https://example.com/")
 
-		if err := store.Insert(ep); err != nil {
+		if err := repository.Insert(ep); err != nil {
 			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
 		}
 
-		got, err := store.ByID(ep.ID)
+		got, err := repository.ByID(ep.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) returned unexpected error: %v", ep.ID, err)
 		}
@@ -36,21 +32,21 @@ func TestStore_Insert(t *testing.T) {
 	})
 
 	t.Run("duplicate", func(t *testing.T) {
-		store := newTestStore(t)
+		repository := newTestRepository(t)
 
 		first := testEndpoint("https://example.com/")
 		second := testEndpoint("https://example.com/")
 
-		if err := store.Insert(first); err != nil {
+		if err := repository.Insert(first); err != nil {
 			t.Fatalf("Insert(%+v) returned unexpected error: %v", first, err)
 		}
 
-		err := store.Insert(second)
+		err := repository.Insert(second)
 		if !errors.Is(err, ErrEndpointExists) {
 			t.Errorf("Insert(%+v) error = %v, want %v", second, err, ErrEndpointExists)
 		}
 
-		endpoints, err := store.List()
+		endpoints, err := repository.List()
 		if err != nil {
 			t.Fatalf("List() returned unexpected error: %v", err)
 		}
@@ -61,8 +57,8 @@ func TestStore_Insert(t *testing.T) {
 	})
 }
 
-func TestStore_InsertConcurrentDuplicate(t *testing.T) {
-	store := newTestStore(t)
+func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
+	repository := newTestRepository(t)
 
 	const goroutines = 20
 
@@ -78,7 +74,7 @@ func TestStore_InsertConcurrentDuplicate(t *testing.T) {
 
 			<-start
 
-			errs <- store.Insert(testEndpoint("https://example.com/"))
+			errs <- repository.Insert(testEndpoint("https://example.com/"))
 		}()
 	}
 
@@ -111,7 +107,7 @@ func TestStore_InsertConcurrentDuplicate(t *testing.T) {
 		t.Errorf("duplicate Insert() calls = %d, want %d", got, want)
 	}
 
-	endpoints, err := store.List()
+	endpoints, err := repository.List()
 	if err != nil {
 		t.Fatalf("List() returned unexpected error: %v", err)
 	}
@@ -121,23 +117,21 @@ func TestStore_InsertConcurrentDuplicate(t *testing.T) {
 	}
 }
 
-// Store.List
-
-func TestStore_List(t *testing.T) {
-	store := newTestStore(t)
+func TestRepository_List(t *testing.T) {
+	repository := newTestRepository(t)
 
 	first := testEndpoint("https://example.com/")
 	second := testEndpoint("https://example.org/")
 
-	if err := store.Insert(first); err != nil {
+	if err := repository.Insert(first); err != nil {
 		t.Fatalf("Insert(%+v) returned unexpected error: %v", first, err)
 	}
 
-	if err := store.Insert(second); err != nil {
+	if err := repository.Insert(second); err != nil {
 		t.Fatalf("Insert(%+v) returned unexpected error: %v", second, err)
 	}
 
-	got, err := store.List()
+	got, err := repository.List()
 	if err != nil {
 		t.Fatalf("List() returned unexpected error: %v", err)
 	}
@@ -152,28 +146,26 @@ func TestStore_List(t *testing.T) {
 
 	got[0].URL = "https://modified.example/"
 
-	stored, err := store.ByID(first.ID)
+	repositoryd, err := repository.ByID(first.ID)
 	if err != nil {
 		t.Fatalf("ByID(%v) returned unexpected error: %v", first.ID, err)
 	}
 
-	if stored.URL != first.URL {
-		t.Errorf("ByID(%v).URL = %q, want %q", first.ID, stored.URL, first.URL)
+	if repositoryd.URL != first.URL {
+		t.Errorf("ByID(%v).URL = %q, want %q", first.ID, repositoryd.URL, first.URL)
 	}
 }
 
-// Store.ByID
-
-func TestStore_ByID(t *testing.T) {
-	store := newTestStore(t)
+func TestRepository_ByID(t *testing.T) {
+	repository := newTestRepository(t)
 	ep := testEndpoint("https://example.com/")
 
-	if err := store.Insert(ep); err != nil {
+	if err := repository.Insert(ep); err != nil {
 		t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
 	}
 
 	t.Run("found", func(t *testing.T) {
-		got, err := store.ByID(ep.ID)
+		got, err := repository.ByID(ep.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) returned unexpected error: %v", ep.ID, err)
 		}
@@ -186,85 +178,36 @@ func TestStore_ByID(t *testing.T) {
 	t.Run("not_found", func(t *testing.T) {
 		id := uuid.NewV7()
 
-		if _, err := store.ByID(id); !errors.Is(err, ErrEndpointNotFound) {
+		if _, err := repository.ByID(id); !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("ByID(%v) error = %v, want %v", id, err, ErrEndpointNotFound)
 		}
 	})
 }
 
-// Store.RemoveByID
-
-func TestStore_RemoveByID(t *testing.T) {
+func TestRepository_RemoveByID(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		store := newTestStore(t)
+		repository := newTestRepository(t)
 		ep := testEndpoint("https://example.com/")
 
-		if err := store.Insert(ep); err != nil {
+		if err := repository.Insert(ep); err != nil {
 			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
 		}
 
-		if err := store.RemoveByID(ep.ID); err != nil {
+		if err := repository.RemoveByID(ep.ID); err != nil {
 			t.Fatalf("RemoveByID(%v) returned unexpected error: %v", ep.ID, err)
 		}
 
-		if _, err := store.ByID(ep.ID); !errors.Is(err, ErrEndpointNotFound) {
+		if _, err := repository.ByID(ep.ID); !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("ByID(%v) error = %v, want %v", ep.ID, err, ErrEndpointNotFound)
 		}
 	})
 
 	t.Run("not_found", func(t *testing.T) {
-		store := newTestStore(t)
+		repository := newTestRepository(t)
 		id := uuid.NewV7()
 
-		if err := store.RemoveByID(id); !errors.Is(err, ErrEndpointNotFound) {
+		if err := repository.RemoveByID(id); !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("RemoveByID(%v) error = %v, want %v", id, err, ErrEndpointNotFound)
-		}
-	})
-}
-
-// Store.UpdateLastCheck
-
-func TestStore_UpdateLastCheck(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		store := newTestStore(t)
-		ep := testEndpoint("https://example.com/")
-
-		if err := store.Insert(ep); err != nil {
-			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
-		}
-
-		want := CheckResult{
-			HTTP: probe.HTTPResult{
-				StatusCode: 200,
-				Responded:  true,
-				Latency:    150 * time.Millisecond,
-			},
-			TLS: probe.TLSResult{
-				Enabled: true,
-				Valid:   true,
-			},
-		}
-
-		if err := store.UpdateLastCheck(ep.ID, want); err != nil {
-			t.Fatalf("UpdateLastCheck(%v, %+v) returned unexpected error: %v", ep.ID, want, err)
-		}
-
-		got, err := store.ByID(ep.ID)
-		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", ep.ID, err)
-		}
-
-		if got.LastCheck != want {
-			t.Errorf("ByID(%v).LastCheck = %+v, want %+v", ep.ID, got.LastCheck, want)
-		}
-	})
-
-	t.Run("not_found", func(t *testing.T) {
-		store := newTestStore(t)
-		id := uuid.NewV7()
-
-		if err := store.UpdateLastCheck(id, CheckResult{}); !errors.Is(err, ErrEndpointNotFound) {
-			t.Errorf("UpdateLastCheck(%v, ...) error = %v, want %v", id, err, ErrEndpointNotFound)
 		}
 	})
 }
@@ -278,7 +221,7 @@ func testEndpoint(rawURL string) Endpoint {
 	}
 }
 
-func newTestStore(t *testing.T) *Store {
+func newTestRepository(t *testing.T) *Repository {
 	t.Helper()
 
 	databaseURL := os.Getenv("SIGNALDOCK_TEST_DATABASE_URL")
@@ -303,5 +246,5 @@ func newTestStore(t *testing.T) *Store {
 		t.Fatalf("TRUNCATE endpoints error = %v", err)
 	}
 
-	return NewStore(pool)
+	return NewRepository(pool)
 }

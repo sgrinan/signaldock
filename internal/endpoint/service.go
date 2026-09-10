@@ -12,26 +12,34 @@ import (
 	"github.com/sgrinan/signaldock/internal/probe"
 )
 
-// Service coordinates endpoint validation, checks, and storage.
+// Service coordinates endpoint validation, checks, and persistence.
 type Service struct {
-	store        endpointStore
+	repository endpointRepository
+	checks     checkStore
+
 	validateHost func(string) ([]netip.Addr, error)
 	probeHTTP    func(*url.URL, []netip.Addr) (probe.HTTPResult, error)
 	probeTLS     func(*url.URL, []netip.Addr) (probe.TLSResult, error)
 }
 
-type endpointStore interface {
+type endpointRepository interface {
 	Insert(endpoint Endpoint) error
 	List() ([]Endpoint, error)
 	ByID(id uuid.UUID) (Endpoint, error)
 	RemoveByID(id uuid.UUID) error
-	UpdateLastCheck(id uuid.UUID, result CheckResult) error
 }
 
-// NewService returns a Service backed by the provided endpoint store.
-func NewService(store endpointStore) *Service {
+type checkStore interface {
+	Set(id uuid.UUID, result CheckResult)
+	Get(id uuid.UUID) CheckResult
+	Delete(id uuid.UUID)
+}
+
+// NewService returns a Service backed by the provided repository and check store.
+func NewService(repository endpointRepository, checks checkStore) *Service {
 	return &Service{
-		store:        store,
+		repository:   repository,
+		checks:       checks,
 		validateHost: probe.ValidateHost,
 		probeHTTP:    probe.HTTP,
 		probeTLS:     probe.TLS,
@@ -57,11 +65,14 @@ func (s *Service) Add(rawURL string) (Endpoint, error) {
 			return Endpoint{}, err
 		}
 
-		ep.LastCheck = hostFailureResult(parsedURL)
+		lastCheck := hostFailureResult(parsedURL)
 
-		if insertErr := s.store.Insert(ep); insertErr != nil {
-			return Endpoint{}, insertErr
+		if err := s.repository.Insert(ep); err != nil {
+			return Endpoint{}, err
 		}
+
+		s.checks.Set(ep.ID, lastCheck)
+		ep.LastCheck = lastCheck
 
 		return ep, CheckError{
 			Host: err,
@@ -69,18 +80,16 @@ func (s *Service) Add(rawURL string) (Endpoint, error) {
 	}
 
 	// Reserve the normalized endpoint before performing slow network I/O.
-	// Store.Insert performs the duplicate check atomically, so concurrent
+	// Repository.Insert performs the duplicate check atomically, so concurrent
 	// Add calls for the same URL cannot all execute the probes.
-	if err := s.store.Insert(ep); err != nil {
+	if err := s.repository.Insert(ep); err != nil {
 		return Endpoint{}, err
 	}
 
 	lastCheck, checkErr := s.check(parsedURL, ips)
-	ep.LastCheck = lastCheck
 
-	if err := s.store.UpdateLastCheck(ep.ID, lastCheck); err != nil {
-		return ep, err
-	}
+	s.checks.Set(ep.ID, lastCheck)
+	ep.LastCheck = lastCheck
 
 	return ep, checkErr
 }
@@ -88,7 +97,7 @@ func (s *Service) Add(rawURL string) (Endpoint, error) {
 // Refresh checks an existing endpoint and stores its latest observed result.
 // Probe failures are returned after the result has been stored.
 func (s *Service) Refresh(id uuid.UUID) (CheckResult, error) {
-	ep, err := s.store.ByID(id)
+	ep, err := s.repository.ByID(id)
 	if err != nil {
 		return CheckResult{}, err
 	}
@@ -102,9 +111,7 @@ func (s *Service) Refresh(id uuid.UUID) (CheckResult, error) {
 	if err != nil {
 		lastCheck := hostFailureResult(parsedURL)
 
-		if updateErr := s.store.UpdateLastCheck(id, lastCheck); updateErr != nil {
-			return lastCheck, updateErr
-		}
+		s.checks.Set(id, lastCheck)
 
 		return lastCheck, CheckError{
 			Host: err,
@@ -113,26 +120,46 @@ func (s *Service) Refresh(id uuid.UUID) (CheckResult, error) {
 
 	lastCheck, checkErr := s.check(parsedURL, ips)
 
-	if err := s.store.UpdateLastCheck(id, lastCheck); err != nil {
-		return lastCheck, err
-	}
+	s.checks.Set(id, lastCheck)
 
 	return lastCheck, checkErr
 }
 
-// List returns a snapshot of the stored endpoints.
+// List returns a snapshot of the stored endpoints with their latest checks.
 func (s *Service) List() ([]Endpoint, error) {
-	return s.store.List()
+	endpoints, err := s.repository.List()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range endpoints {
+		endpoints[i].LastCheck = s.checks.Get(endpoints[i].ID)
+	}
+
+	return endpoints, nil
 }
 
-// ByID returns the endpoint with the given ID.
+// ByID returns the endpoint with the given ID and its latest check.
 func (s *Service) ByID(id uuid.UUID) (Endpoint, error) {
-	return s.store.ByID(id)
+	ep, err := s.repository.ByID(id)
+	if err != nil {
+		return Endpoint{}, err
+	}
+
+	ep.LastCheck = s.checks.Get(id)
+
+	return ep, nil
 }
 
 // RemoveByID removes the endpoint with the given ID.
 func (s *Service) RemoveByID(id uuid.UUID) error {
-	return s.store.RemoveByID(id)
+	if err := s.repository.RemoveByID(id); err != nil {
+		return err
+	}
+
+	s.checks.Delete(id)
+
+	return nil
 }
 
 // validateEndpointHost validates the endpoint destination and translates

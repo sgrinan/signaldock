@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// ParseURL
-
 func TestParseURL(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		tests := []struct {

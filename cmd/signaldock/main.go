@@ -64,8 +64,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	endpointStore := endpoint.NewStore(pool)
-	endpointService := endpoint.NewService(endpointStore)
+	endpointRepository := endpoint.NewRepository(pool)
+	endpointChecks := endpoint.NewCheckStore()
+	endpointService := endpoint.NewService(endpointRepository, endpointChecks)
 
 	userStore := user.NewStore(pool)
 

@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// CheckError.Error
-
 func TestCheckError_Error(t *testing.T) {
 	hostErr := errors.New("host failed")
 	httpErr := errors.New("http failed")
@@ -61,8 +59,6 @@ func TestCheckError_Error(t *testing.T) {
 		})
 	}
 }
-
-// CheckError.Unwrap
 
 func TestCheckError_Unwrap(t *testing.T) {
 	hostErr := errors.New("host failed")

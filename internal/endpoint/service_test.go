@@ -15,11 +15,9 @@ import (
 	"github.com/sgrinan/signaldock/internal/probe"
 )
 
-// Service.Add
-
 func TestService_Add(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		s, store := newTestService()
+		s, repository, checks := newTestService()
 
 		got, err := s.Add("HTTPS://EXAMPLE.COM:443")
 		if err != nil {
@@ -42,18 +40,29 @@ func TestService_Add(t *testing.T) {
 			t.Error("Add().LastCheck.TLS.Valid = false, want true")
 		}
 
-		stored, err := store.ByID(got.ID)
+		stored, err := repository.ByID(got.ID)
 		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", got.ID, err)
+			t.Fatalf("ByID(%v) error = %v, want nil", got.ID, err)
 		}
 
-		if stored != got {
-			t.Errorf("ByID(%v) = %+v, want %+v", got.ID, stored, got)
+		wantStored := Endpoint{
+			ID:  got.ID,
+			URL: got.URL,
+		}
+
+		if stored != wantStored {
+			t.Errorf("ByID(%v) = %+v, want %+v", got.ID, stored, wantStored)
+		}
+
+		storedCheck := checks.Get(got.ID)
+
+		if storedCheck != got.LastCheck {
+			t.Errorf("Get(%v) = %+v, want %+v", got.ID, storedCheck, got.LastCheck)
 		}
 	})
 
 	t.Run("invalid_url", func(t *testing.T) {
-		s, store := newTestService()
+		s, repository, _ := newTestService()
 
 		const rawURL = "ftp://example.com"
 
@@ -67,7 +76,7 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("Add(%q) = %+v, want zero Endpoint", rawURL, got)
 		}
 
-		endpoints, err := store.List()
+		endpoints, err := repository.List()
 		if err != nil {
 			t.Fatalf("List() returned unexpected error: %v", err)
 		}
@@ -78,7 +87,7 @@ func TestService_Add(t *testing.T) {
 	})
 
 	t.Run("unsafe_host", func(t *testing.T) {
-		s, store := newTestService()
+		s, repository, _ := newTestService()
 
 		s.validateHost = func(string) ([]netip.Addr, error) {
 			return nil, probe.ErrUnsafeHost
@@ -96,7 +105,7 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("Add(%q) = %+v, want zero Endpoint", rawURL, got)
 		}
 
-		endpoints, err := store.List()
+		endpoints, err := repository.List()
 		if err != nil {
 			t.Fatalf("List() returned unexpected error: %v", err)
 		}
@@ -107,7 +116,7 @@ func TestService_Add(t *testing.T) {
 	})
 
 	t.Run("host_check_error_stores_failed_result", func(t *testing.T) {
-		s, store := newTestService()
+		s, repository, checks := newTestService()
 
 		s.validateHost = func(string) ([]netip.Addr, error) {
 			return nil, probe.ErrNoResolvedAddresses
@@ -142,18 +151,29 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("Add(%q).LastCheck.TLS.Enabled = false, want true", rawURL)
 		}
 
-		stored, err := store.ByID(got.ID)
+		stored, err := repository.ByID(got.ID)
 		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", got.ID, err)
+			t.Fatalf("ByID(%v) error = %v, want nil", got.ID, err)
 		}
 
-		if stored != got {
-			t.Errorf("ByID(%v) = %+v, want %+v", got.ID, stored, got)
+		wantStored := Endpoint{
+			ID:  got.ID,
+			URL: got.URL,
+		}
+
+		if stored != wantStored {
+			t.Errorf("ByID(%v) = %+v, want %+v", got.ID, stored, wantStored)
+		}
+
+		storedCheck := checks.Get(got.ID)
+
+		if storedCheck != got.LastCheck {
+			t.Errorf("Get(%v) = %+v, want %+v", got.ID, storedCheck, got.LastCheck)
 		}
 	})
 
 	t.Run("check_error_stores_result", func(t *testing.T) {
-		s, store := newTestService()
+		s, repository, checks := newTestService()
 
 		httpErr := errors.New("HTTP failed")
 
@@ -176,18 +196,29 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("errors.Is(Add(%q) error, httpErr) = false, want true", rawURL)
 		}
 
-		stored, err := store.ByID(got.ID)
+		stored, err := repository.ByID(got.ID)
 		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", got.ID, err)
+			t.Fatalf("ByID(%v) error = %v, want nil", got.ID, err)
 		}
 
-		if stored != got {
-			t.Errorf("ByID(%v) = %+v, want %+v", got.ID, stored, got)
+		wantStored := Endpoint{
+			ID:  got.ID,
+			URL: got.URL,
+		}
+
+		if stored != wantStored {
+			t.Errorf("ByID(%v) = %+v, want %+v", got.ID, stored, wantStored)
+		}
+
+		storedCheck := checks.Get(got.ID)
+
+		if storedCheck != got.LastCheck {
+			t.Errorf("Get(%v) = %+v, want %+v", got.ID, storedCheck, got.LastCheck)
 		}
 	})
 
 	t.Run("duplicate", func(t *testing.T) {
-		s, store := newTestService()
+		s, repository, checks := newTestService()
 
 		const rawURL = "https://example.com"
 
@@ -201,7 +232,7 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("second Add(%q) error = %v, want %v", rawURL, err, ErrEndpointExists)
 		}
 
-		endpoints, err := store.List()
+		endpoints, err := repository.List()
 		if err != nil {
 			t.Fatalf("List() returned unexpected error: %v", err)
 		}
@@ -210,19 +241,30 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("len(List()) = %d, want 1", got)
 		}
 
-		stored, err := store.ByID(first.ID)
+		stored, err := repository.ByID(first.ID)
 		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", first.ID, err)
+			t.Fatalf("ByID(%v) error = %v, want nil", first.ID, err)
 		}
 
-		if stored != first {
-			t.Errorf("ByID(%v) = %+v, want %+v", first.ID, stored, first)
+		wantStored := Endpoint{
+			ID:  first.ID,
+			URL: first.URL,
+		}
+
+		if stored != wantStored {
+			t.Errorf("ByID(%v) = %+v, want %+v", first.ID, stored, wantStored)
+		}
+
+		storedCheck := checks.Get(first.ID)
+
+		if storedCheck != first.LastCheck {
+			t.Errorf("Get(%v) = %+v, want %+v", first.ID, storedCheck, first.LastCheck)
 		}
 	})
 }
 
 func TestService_AddConcurrentDuplicate(t *testing.T) {
-	s, store := newTestService()
+	s, repository, _ := newTestService()
 
 	const goroutines = 10
 
@@ -290,7 +332,7 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 		t.Errorf("duplicate Add() calls = %d, want %d", got, want)
 	}
 
-	endpoints, err := store.List()
+	endpoints, err := repository.List()
 	if err != nil {
 		t.Fatalf("List() returned unexpected error: %v", err)
 	}
@@ -308,15 +350,13 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 	}
 }
 
-// Service.Refresh
-
 func TestService_Refresh(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		s, store := newTestService()
+		s, repository, checks := newTestService()
 
 		ep := testEndpoint("https://example.com/")
 
-		if err := store.Insert(ep); err != nil {
+		if err := repository.Insert(ep); err != nil {
 			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
 		}
 
@@ -348,18 +388,15 @@ func TestService_Refresh(t *testing.T) {
 			t.Errorf("Refresh(%v) = %+v, want %+v", ep.ID, got, want)
 		}
 
-		stored, err := store.ByID(ep.ID)
-		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", ep.ID, err)
-		}
+		stored := checks.Get(ep.ID)
 
-		if stored.LastCheck != want {
-			t.Errorf("ByID(%v).LastCheck = %+v, want %+v", ep.ID, stored.LastCheck, want)
+		if stored != want {
+			t.Errorf("Get(%v) = %+v, want %+v", ep.ID, stored, want)
 		}
 	})
 
 	t.Run("not_found", func(t *testing.T) {
-		s, _ := newTestService()
+		s, _, _ := newTestService()
 		id := uuid.NewV7()
 
 		_, err := s.Refresh(id)
@@ -370,7 +407,7 @@ func TestService_Refresh(t *testing.T) {
 	})
 
 	t.Run("host_check_error_updates_result", func(t *testing.T) {
-		s, store := newTestService()
+		s, repository, checks := newTestService()
 
 		ep := testEndpoint("https://example.com/")
 		ep.LastCheck = CheckResult{
@@ -385,9 +422,13 @@ func TestService_Refresh(t *testing.T) {
 			},
 		}
 
-		if err := store.Insert(ep); err != nil {
-			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
+		if err := repository.Insert(ep); err != nil {
+			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
+
+		// Repository only persists endpoint configuration.
+		// The previous runtime check belongs in CheckStore.
+		checks.Set(ep.ID, ep.LastCheck)
 
 		s.validateHost = func(string) ([]netip.Addr, error) {
 			return nil, probe.ErrNoResolvedAddresses
@@ -401,7 +442,12 @@ func TestService_Refresh(t *testing.T) {
 		}
 
 		if !errors.Is(err, probe.ErrNoResolvedAddresses) {
-			t.Errorf("Refresh(%v) error = %v, want %v", ep.ID, err, probe.ErrNoResolvedAddresses)
+			t.Errorf(
+				"Refresh(%v) error = %v, want %v",
+				ep.ID,
+				err,
+				probe.ErrNoResolvedAddresses,
+			)
 		}
 
 		if got.HTTP.Responded {
@@ -416,23 +462,20 @@ func TestService_Refresh(t *testing.T) {
 			t.Errorf("Refresh(%v).TLS.Enabled = false, want true", ep.ID)
 		}
 
-		stored, err := store.ByID(ep.ID)
-		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", ep.ID, err)
-		}
+		stored := checks.Get(ep.ID)
 
-		if stored.LastCheck != got {
-			t.Errorf("ByID(%v).LastCheck = %+v, want %+v", ep.ID, stored.LastCheck, got)
+		if stored != got {
+			t.Errorf("Get(%v) = %+v, want %+v", ep.ID, stored, got)
 		}
 	})
 
 	t.Run("check_error_updates_result", func(t *testing.T) {
-		s, store := newTestService()
+		s, repository, checks := newTestService()
 
 		ep := testEndpoint("https://example.com/")
 
-		if err := store.Insert(ep); err != nil {
-			t.Fatalf("Insert(%+v) returned unexpected error: %v", ep, err)
+		if err := repository.Insert(ep); err != nil {
+			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
 		httpErr := errors.New("HTTP failed")
@@ -452,30 +495,41 @@ func TestService_Refresh(t *testing.T) {
 		}
 
 		if got.HTTP != wantHTTP {
-			t.Errorf("Refresh(%v).HTTP = %+v, want %+v", ep.ID, got.HTTP, wantHTTP)
+			t.Errorf(
+				"Refresh(%v).HTTP = %+v, want %+v",
+				ep.ID,
+				got.HTTP,
+				wantHTTP,
+			)
 		}
 
-		stored, err := store.ByID(ep.ID)
-		if err != nil {
-			t.Fatalf("ByID(%v) returned unexpected error: %v", ep.ID, err)
-		}
+		stored := checks.Get(ep.ID)
 
-		if stored.LastCheck != got {
-			t.Errorf("ByID(%v).LastCheck = %+v, want %+v", ep.ID, stored.LastCheck, got)
+		if stored != got {
+			t.Errorf("Get(%v) = %+v, want %+v", ep.ID, stored, got)
 		}
 	})
 }
 
 // Test helpers
 
-type fakeStore struct {
+type fakeRepository struct {
 	mu        sync.RWMutex
 	endpoints []Endpoint
 }
 
-func newTestService() (*Service, *fakeStore) {
-	store := &fakeStore{}
-	s := NewService(store)
+type fakeCheckStore struct {
+	mu      sync.RWMutex
+	results map[uuid.UUID]CheckResult
+}
+
+func newTestService() (*Service, *fakeRepository, *fakeCheckStore) {
+	repository := &fakeRepository{}
+	checks := &fakeCheckStore{
+		results: make(map[uuid.UUID]CheckResult),
+	}
+
+	s := NewService(repository, checks)
 
 	ips := []netip.Addr{
 		netip.MustParseAddr("203.0.113.10"),
@@ -499,69 +553,82 @@ func newTestService() (*Service, *fakeStore) {
 		}, nil
 	}
 
-	return s, store
+	return s, repository, checks
 }
 
-func (store *fakeStore) Insert(endpoint Endpoint) error {
-	store.mu.Lock()
-	defer store.mu.Unlock()
+func (r *fakeRepository) Insert(endpoint Endpoint) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	for _, existing := range store.endpoints {
+	for _, existing := range r.endpoints {
 		if existing.URL == endpoint.URL {
 			return ErrEndpointExists
 		}
 	}
 
-	store.endpoints = append(store.endpoints, endpoint)
+	r.endpoints = append(r.endpoints, Endpoint{
+		ID:  endpoint.ID,
+		URL: endpoint.URL,
+	})
 
 	return nil
 }
 
-func (store *fakeStore) List() ([]Endpoint, error) {
-	store.mu.Lock()
-	defer store.mu.Unlock()
+func (r *fakeRepository) List() ([]Endpoint, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
-	endpoints := make([]Endpoint, len(store.endpoints))
-	copy(endpoints, store.endpoints)
+	endpoints := make([]Endpoint, len(r.endpoints))
+	copy(endpoints, r.endpoints)
 
 	return endpoints, nil
 }
 
-func (store *fakeStore) ByID(id uuid.UUID) (Endpoint, error) {
-	store.mu.Lock()
-	defer store.mu.Unlock()
+func (r *fakeRepository) ByID(id uuid.UUID) (Endpoint, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
-	for _, endpoint := range store.endpoints {
+	for _, endpoint := range r.endpoints {
 		if endpoint.ID == id {
 			return endpoint, nil
 		}
 	}
+
 	return Endpoint{}, ErrEndpointNotFound
 }
 
-func (store *fakeStore) RemoveByID(id uuid.UUID) error {
-	store.mu.Lock()
-	defer store.mu.Unlock()
+func (r *fakeRepository) RemoveByID(id uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	for index, endpoint := range store.endpoints {
+	for index, endpoint := range r.endpoints {
 		if endpoint.ID == id {
-			store.endpoints = append(store.endpoints[:index], store.endpoints[index+1:]...)
+			r.endpoints = append(r.endpoints[:index], r.endpoints[index+1:]...)
+
 			return nil
 		}
 	}
+
 	return ErrEndpointNotFound
 }
 
-func (store *fakeStore) UpdateLastCheck(id uuid.UUID, result CheckResult) error {
-	store.mu.Lock()
-	defer store.mu.Unlock()
+func (s *fakeCheckStore) Set(id uuid.UUID, result CheckResult) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	for index, endpoint := range store.endpoints {
-		if endpoint.ID == id {
-			store.endpoints[index].LastCheck = result
-			return nil
-		}
-	}
+	s.results[id] = result
+}
 
-	return ErrEndpointNotFound
+func (s *fakeCheckStore) Get(id uuid.UUID) CheckResult {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.results[id]
+}
+
+func (s *fakeCheckStore) Delete(id uuid.UUID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.results, id)
 }
