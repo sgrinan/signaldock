@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -294,5 +295,68 @@ func TestHandler_RequireAuthUserStoreError(t *testing.T) {
 
 	if got, want := recorder.Code, http.StatusInternalServerError; got != want {
 		t.Errorf("requireAuth() status = %d, want %d", got, want)
+	}
+}
+
+func TestHandler_RequireAdmin(t *testing.T) {
+	tests := []struct {
+		name       string
+		account    *user.User
+		wantStatus int
+		wantNext   bool
+	}{
+		{
+			name: "admin",
+			account: &user.User{
+				ID:   uuid.NewV7(),
+				Role: user.RoleAdmin,
+			},
+			wantStatus: http.StatusOK,
+			wantNext:   true,
+		},
+		{
+			name: "viewer",
+			account: &user.User{
+				ID:   uuid.NewV7(),
+				Role: user.RoleViewer,
+			},
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "missing_user",
+			wantStatus: http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newTestHandler(&fakeEndpointService{})
+
+			nextCalled := false
+
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				nextCalled = true
+				w.WriteHeader(http.StatusOK)
+			})
+
+			req := httptest.NewRequest(http.MethodPost, "/endpoints", nil)
+
+			if tt.account != nil {
+				ctx := context.WithValue(req.Context(), currentUserKey, *tt.account)
+				req = req.WithContext(ctx)
+			}
+
+			recorder := httptest.NewRecorder()
+
+			h.requireAdmin(next).ServeHTTP(recorder, req)
+
+			if got := recorder.Code; got != tt.wantStatus {
+				t.Errorf("requireAdmin() status = %d, want %d", got, tt.wantStatus)
+			}
+
+			if got := nextCalled; got != tt.wantNext {
+				t.Errorf("requireAdmin() next called = %v, want %v", got, tt.wantNext)
+			}
+		})
 	}
 }

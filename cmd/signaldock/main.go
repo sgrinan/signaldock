@@ -13,12 +13,12 @@ import (
 
 	"uuid"
 
+	"github.com/sgrinan/signaldock/internal/auth"
 	"github.com/sgrinan/signaldock/internal/database"
 	"github.com/sgrinan/signaldock/internal/endpoint"
 	"github.com/sgrinan/signaldock/internal/session"
 	"github.com/sgrinan/signaldock/internal/user"
 	"github.com/sgrinan/signaldock/internal/web"
-	"github.com/sgrinan/signaldock/internal/auth"
 )
 
 const (

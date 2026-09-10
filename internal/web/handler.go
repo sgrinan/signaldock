@@ -59,9 +59,9 @@ func NewHandler(endpoints endpointService, users userStore, sessions sessionServ
 	mux.Handle("GET /{$}", h.requireAuth(http.HandlerFunc(h.handleGetIndex)))
 	mux.Handle("GET /endpoints/{id}", h.requireAuth(http.HandlerFunc(h.handleGetEndpoint)))
 
-	mux.Handle("POST /endpoints", h.requireAuth(http.HandlerFunc(h.handlePostEndpoint)))
-	mux.Handle("POST /endpoints/{id}/delete", h.requireAuth(http.HandlerFunc(h.handleDeleteEndpoint)))
-	mux.Handle("POST /endpoints/{id}/refresh", h.requireAuth(http.HandlerFunc(h.handleRefreshEndpoint)))
+	mux.Handle("POST /endpoints", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handlePostEndpoint))))
+	mux.Handle("POST /endpoints/{id}/delete", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleDeleteEndpoint))))
+	mux.Handle("POST /endpoints/{id}/refresh", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleRefreshEndpoint))))
 	mux.Handle("POST /logout", h.requireAuth(http.HandlerFunc(h.handlePostLogout)))
 
 	mux.HandleFunc("GET /login", h.handleGetLogin)
