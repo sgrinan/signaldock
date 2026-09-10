@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// newHTTPClient
-
 func TestNewHTTPClient(t *testing.T) {
 	parsedURL := mustParseURL(t, "https://example.com/")
 	publicIP := netip.MustParseAddr("8.8.8.8")
@@ -20,7 +18,7 @@ func TestNewHTTPClient(t *testing.T) {
 
 		client, err := newHTTPClient(parsedURL, []netip.Addr{publicIP})
 		if err != nil {
-			t.Fatalf("newHTTPClient() returned unexpected error: %v", err)
+			t.Fatalf("newHTTPClient() error = %v, want nil", err)
 		}
 
 		return client
@@ -93,7 +91,7 @@ func TestNewHTTPClient(t *testing.T) {
 
 		err := client.CheckRedirect(req, nil)
 		if err != nil {
-			t.Fatalf("CheckRedirect() returned unexpected error: %v", err)
+			t.Fatalf("CheckRedirect() error = %v, want nil", err)
 		}
 
 		if got := req.Header.Get("Referer"); got != "" {
@@ -101,8 +99,6 @@ func TestNewHTTPClient(t *testing.T) {
 		}
 	})
 }
-
-// HTTP
 
 func TestHTTP(t *testing.T) {
 	t.Run("response", func(t *testing.T) {

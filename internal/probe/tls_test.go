@@ -1,24 +1,12 @@
 package probe
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"errors"
-	"math/big"
-	"net/http"
-	"net/http/httptest"
 	"net/netip"
-	"net/url"
 	"testing"
 	"time"
 )
-
-// TLS
 
 func TestTLS(t *testing.T) {
 	t.Run("non_https", func(t *testing.T) {
@@ -26,7 +14,7 @@ func TestTLS(t *testing.T) {
 
 		got, err := TLS(parsedURL, nil)
 		if err != nil {
-			t.Fatalf("TLS(%q) returned unexpected error: %v", parsedURL, err)
+			t.Fatalf("TLS(%q) error = %v, want nil", parsedURL, err)
 		}
 
 		if got != (TLSResult{}) {
@@ -49,8 +37,6 @@ func TestTLS(t *testing.T) {
 	})
 }
 
-// tlsProbe
-
 func TestTLSProbe(t *testing.T) {
 	t.Run("valid_certificate", func(t *testing.T) {
 		now := time.Now().UTC()
@@ -59,7 +45,7 @@ func TestTLSProbe(t *testing.T) {
 
 		got, err := tlsProbe(parsedURL, ips, roots)
 		if err != nil {
-			t.Fatalf("tlsProbe(%q) returned unexpected error: %v", parsedURL, err)
+			t.Fatalf("tlsProbe(%q) error = %v, want nil", parsedURL, err)
 		}
 
 		if !got.Enabled {
@@ -190,7 +176,7 @@ func TestTLSProbe(t *testing.T) {
 
 		got, err := tlsProbe(parsedURL, ips, roots)
 		if err != nil {
-			t.Fatalf("tlsProbe(%q) returned unexpected error: %v", parsedURL, err)
+			t.Fatalf("tlsProbe(%q) error = %v, want nil", parsedURL, err)
 		}
 
 		if !got.Valid {
@@ -198,8 +184,6 @@ func TestTLSProbe(t *testing.T) {
 		}
 	})
 }
-
-// verifyCertificate
 
 func TestVerifyCertificate(t *testing.T) {
 	const hostname = "example.com"
@@ -210,8 +194,6 @@ func TestVerifyCertificate(t *testing.T) {
 		t.Errorf("verifyCertificate(nil, %q, nil) error = %v, want %v", hostname, err, ErrNoPeerCertificate)
 	}
 }
-
-// daysBetween
 
 func TestDaysBetween(t *testing.T) {
 	now := time.Date(2026, time.September, 6, 12, 0, 0, 0, time.UTC)
@@ -250,110 +232,4 @@ func TestDaysBetween(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TLS test helpers
-
-func newTLSTestServer(t *testing.T, serverName string, notBefore time.Time, notAfter time.Time) (*httptest.Server, *url.URL, []netip.Addr, *x509.CertPool, *x509.Certificate) {
-	t.Helper()
-
-	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("ecdsa.GenerateKey() returned unexpected error: %v", err)
-	}
-
-	caTemplate := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: "SignalDock Test CA",
-		},
-		NotBefore:             notBefore.Add(-24 * time.Hour),
-		NotAfter:              notAfter.Add(365 * 24 * time.Hour),
-		IsCA:                  true,
-		BasicConstraintsValid: true,
-		KeyUsage:              x509.KeyUsageCertSign,
-	}
-
-	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
-	if err != nil {
-		t.Fatalf("x509.CreateCertificate(CA) returned unexpected error: %v", err)
-	}
-
-	caCert, err := x509.ParseCertificate(caDER)
-	if err != nil {
-		t.Fatalf("x509.ParseCertificate(CA) returned unexpected error: %v", err)
-	}
-
-	serverKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("ecdsa.GenerateKey() returned unexpected error: %v", err)
-	}
-
-	serverTemplate := &x509.Certificate{
-		SerialNumber: big.NewInt(2),
-		Subject: pkix.Name{
-			CommonName: serverName,
-		},
-		DNSNames:  []string{serverName},
-		NotBefore: notBefore,
-		NotAfter:  notAfter,
-		KeyUsage:  x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageServerAuth,
-		},
-	}
-
-	serverDER, err := x509.CreateCertificate(rand.Reader, serverTemplate, caCert, &serverKey.PublicKey, caKey)
-	if err != nil {
-		t.Fatalf("x509.CreateCertificate(server) returned unexpected error: %v", err)
-	}
-
-	serverCert, err := x509.ParseCertificate(serverDER)
-	if err != nil {
-		t.Fatalf("x509.ParseCertificate(server) returned unexpected error: %v", err)
-	}
-
-	serverKeyDER, err := x509.MarshalECPrivateKey(serverKey)
-	if err != nil {
-		t.Fatalf("x509.MarshalECPrivateKey() returned unexpected error: %v", err)
-	}
-
-	certificate, err := tls.X509KeyPair(
-		pem.EncodeToMemory(&pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: serverDER,
-		}),
-		pem.EncodeToMemory(&pem.Block{
-			Type:  "EC PRIVATE KEY",
-			Bytes: serverKeyDER,
-		}),
-	)
-	if err != nil {
-		t.Fatalf("tls.X509KeyPair() returned unexpected error: %v", err)
-	}
-
-	server := httptest.NewUnstartedServer(
-		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
-	)
-
-	server.TLS = &tls.Config{
-		Certificates: []tls.Certificate{certificate},
-		MinVersion:   tls.VersionTLS12,
-	}
-
-	server.StartTLS()
-	t.Cleanup(server.Close)
-
-	serverURL := mustParseURL(t, server.URL)
-
-	parsedURL := mustParseURL(t, "https://"+serverName+":"+serverURL.Port())
-
-	roots := x509.NewCertPool()
-	roots.AddCert(caCert)
-
-	ips := []netip.Addr{
-		netip.MustParseAddr("127.0.0.1"),
-	}
-
-	return server, parsedURL, ips, roots, serverCert
 }

@@ -5,14 +5,12 @@ import (
 	"testing"
 )
 
-// Test helpers
-
 func mustParseURL(t *testing.T, rawURL string) *url.URL {
 	t.Helper()
 
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
-		t.Fatalf("url.Parse(%q) returned unexpected error: %v", rawURL, err)
+		t.Fatalf("url.Parse(%q) error = %v, want nil", rawURL, err)
 	}
 
 	return parsedURL

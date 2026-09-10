@@ -13,7 +13,11 @@ const resolverTimeout = 2 * time.Second
 // sharedAddressPrefix is the RFC 6598 shared address space used by CGNAT.
 var sharedAddressPrefix = netip.MustParsePrefix("100.64.0.0/10")
 
-type lookupNetIPFunc func(context.Context, string, string) ([]netip.Addr, error)
+type lookupNetIPFunc func(
+	context.Context,
+	string,
+	string,
+) ([]netip.Addr, error)
 
 // ValidateHost resolves host and rejects local, private, and other
 // disallowed destinations for outbound probes.

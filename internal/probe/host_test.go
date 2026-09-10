@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// isUnsafeAddr
-
 func TestIsUnsafeAddr(t *testing.T) {
 	tests := []struct {
 		name string
@@ -79,8 +77,6 @@ func TestIsUnsafeAddr(t *testing.T) {
 	}
 }
 
-// ValidateHost
-
 func TestValidateHost(t *testing.T) {
 	t.Run("public_ip", func(t *testing.T) {
 		const host = "8.8.8.8"
@@ -116,7 +112,7 @@ func TestValidateHost(t *testing.T) {
 
 		got, err := ValidateHost(host)
 		if err != nil {
-			t.Fatalf("ValidateHost(%q) returned unexpected error: %v", host, err)
+			t.Fatalf("ValidateHost(%q) error = %v, want nil", host, err)
 		}
 
 		want := netip.MustParseAddr("8.8.8.8")
@@ -130,8 +126,6 @@ func TestValidateHost(t *testing.T) {
 		}
 	})
 }
-
-// validateHost
 
 func TestValidateHostWithLookup(t *testing.T) {
 	publicIPv4 := netip.MustParseAddr("8.8.8.8")
@@ -206,7 +200,7 @@ func TestValidateHostWithLookup(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("validateHost(%q) returned unexpected error: %v", host, err)
+				t.Fatalf("validateHost(%q) error = %v, want nil", host, err)
 			}
 
 			if !slices.Equal(got, tt.want) {
