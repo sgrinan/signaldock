@@ -68,15 +68,8 @@ func run(logger *slog.Logger) error {
 	sessionRepository := session.NewRepository(pool)
 	sessionService := session.NewService(sessionRepository)
 
-	endpoints, err := endpointService.List()
-	if err != nil {
-		return fmt.Errorf("load endpoints: %w", err)
-	}
-
-	for _, ep := range endpoints {
-		if _, err := endpointService.Refresh(ep.ID); err != nil {
-			logger.Warn("failed to refresh endpoint on startup", "endpoint_id", ep.ID, "url", ep.URL, "error", err)
-		}
+	if err := refreshEndpointsOnStartup(endpointService, logger); err != nil {
+		return err
 	}
 
 	handler, err := web.NewHandler(endpointService, userRepository, sessionService, logger)
