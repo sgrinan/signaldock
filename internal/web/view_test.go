@@ -11,8 +11,6 @@ import (
 	"github.com/sgrinan/signaldock/internal/probe"
 )
 
-// newEndpointListItem
-
 func TestNewEndpointListItem(t *testing.T) {
 	checkedAt := time.Date(2026, time.September, 6, 18, 30, 0, 0, time.UTC)
 
@@ -190,8 +188,6 @@ func TestNewEndpointListItem(t *testing.T) {
 	}
 }
 
-// newEndpointListItems
-
 func TestNewEndpointListItems(t *testing.T) {
 	first := endpoint.Endpoint{
 		ID:  uuid.NewV7(),
@@ -222,8 +218,6 @@ func TestNewEndpointListItems(t *testing.T) {
 		t.Errorf("newEndpointListItems()[1].ID = %v, want %v", got[1].ID, second.ID)
 	}
 }
-
-// tlsExpiryClass
 
 func TestTLSExpiryClass(t *testing.T) {
 	tests := []struct {

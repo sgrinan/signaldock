@@ -26,14 +26,14 @@ type endpointService interface {
 
 type handler struct {
 	endpoints endpointService
-	users     userStore
+	users     userRepository
 	sessions  sessionService
 	templates *template.Template
 	logger    *slog.Logger
 }
 
 // NewHandler returns the HTTP handler for the SignalDock web interface.
-func NewHandler(endpoints endpointService, users userStore, sessions sessionService, logger *slog.Logger) (http.Handler, error) {
+func NewHandler(endpoints endpointService, users userRepository, sessions sessionService, logger *slog.Logger) (http.Handler, error) {
 	tmpl, err := template.ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
@@ -68,8 +68,6 @@ func NewHandler(endpoints endpointService, users userStore, sessions sessionServ
 
 	mux.Handle("GET /users", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleGetUsers))))
 	mux.Handle("POST /users", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handlePostUser))))
-	mux.Handle("POST /users/{id}/disable", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleDisableUser))))
-	mux.Handle("POST /users/{id}/enable", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleEnableUser))))
 	mux.Handle("POST /users/{id}/delete", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleDeleteUser))))
 	mux.Handle("POST /users/{id}", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleUpdateUser))))
 

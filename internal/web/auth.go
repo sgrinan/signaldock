@@ -15,7 +15,7 @@ type contextKey string
 
 const currentUserKey contextKey = "current-user"
 
-type userStore interface {
+type userRepository interface {
 	Insert(user.User) error
 	List() ([]user.User, error)
 	ByUsername(string) (user.User, error)

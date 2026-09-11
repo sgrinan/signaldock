@@ -11,105 +11,8 @@ import (
 	"uuid"
 
 	"github.com/sgrinan/signaldock/internal/auth"
-	"github.com/sgrinan/signaldock/internal/session"
 	"github.com/sgrinan/signaldock/internal/user"
 )
-
-type fakeUserStore struct {
-	insertFunc      func(user.User) error
-	listFunc        func() ([]user.User, error)
-	byUsernameFunc  func(string) (user.User, error)
-	byIDFunc        func(uuid.UUID) (user.User, error)
-	setDisabledFunc func(uuid.UUID, bool) error
-	setRoleFunc     func(uuid.UUID, user.Role) error
-	removeByIDFunc  func(uuid.UUID) error
-}
-
-func (f *fakeUserStore) Insert(account user.User) error {
-	if f.insertFunc != nil {
-		return f.insertFunc(account)
-	}
-
-	return nil
-}
-
-func (f *fakeUserStore) List() ([]user.User, error) {
-	if f.listFunc != nil {
-		return f.listFunc()
-	}
-
-	return nil, nil
-}
-
-func (f *fakeUserStore) ByUsername(username string) (user.User, error) {
-	if f.byUsernameFunc != nil {
-		return f.byUsernameFunc(username)
-	}
-
-	return user.User{}, user.ErrUserNotFound
-}
-
-func (f *fakeUserStore) ByID(id uuid.UUID) (user.User, error) {
-	if f.byIDFunc != nil {
-		return f.byIDFunc(id)
-	}
-
-	return user.User{}, user.ErrUserNotFound
-}
-
-func (f *fakeUserStore) SetDisabled(id uuid.UUID, disabled bool) error {
-	if f.setDisabledFunc != nil {
-		return f.setDisabledFunc(id, disabled)
-	}
-
-	return nil
-}
-
-func (f *fakeUserStore) SetRole(id uuid.UUID, role user.Role) error {
-	if f.setRoleFunc != nil {
-		return f.setRoleFunc(id, role)
-	}
-
-	return nil
-}
-
-func (f *fakeUserStore) RemoveByID(id uuid.UUID) error {
-	if f.removeByIDFunc != nil {
-		return f.removeByIDFunc(id)
-	}
-
-	return nil
-}
-
-type fakeSessionService struct {
-	createFunc   func(uuid.UUID) (string, error)
-	validateFunc func(string) (session.Session, error)
-	deleteFunc   func(string) error
-}
-
-func (f *fakeSessionService) Create(userID uuid.UUID) (string, error) {
-	if f.createFunc != nil {
-		return f.createFunc(userID)
-	}
-
-	return "test-session-token", nil
-}
-
-func (f *fakeSessionService) Validate(token string) (session.Session, error) {
-	if f.validateFunc != nil {
-		return f.validateFunc(token)
-	}
-
-	return session.Session{}, nil
-}
-
-func (f *fakeSessionService) Delete(token string) error {
-	if f.deleteFunc != nil {
-		return f.deleteFunc(token)
-	}
-
-	return nil
-}
 
 func TestHandler_HandleGetLogin(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
@@ -135,7 +38,7 @@ func TestHandler_HandlePostLogin(t *testing.T) {
 
 	h := newTestHandler(&fakeEndpointService{})
 
-	h.users = &fakeUserStore{
+	h.users = &fakeUserRepository{
 		byUsernameFunc: func(username string) (user.User, error) {
 			if got, want := username, "admin"; got != want {
 				t.Errorf("ByUsername(%q), want %q", got, want)
@@ -211,11 +114,11 @@ func TestHandler_HandlePostLoginInvalidCredentials(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		users userStore
+		users userRepository
 	}{
 		{
 			name: "user_not_found",
-			users: &fakeUserStore{
+			users: &fakeUserRepository{
 				byUsernameFunc: func(string) (user.User, error) {
 					return user.User{}, user.ErrUserNotFound
 				},
@@ -223,7 +126,7 @@ func TestHandler_HandlePostLoginInvalidCredentials(t *testing.T) {
 		},
 		{
 			name: "wrong_password",
-			users: &fakeUserStore{
+			users: &fakeUserRepository{
 				byUsernameFunc: func(string) (user.User, error) {
 					return user.User{
 						ID:           uuid.NewV7(),
@@ -236,7 +139,7 @@ func TestHandler_HandlePostLoginInvalidCredentials(t *testing.T) {
 		},
 		{
 			name: "disabled_user",
-			users: &fakeUserStore{
+			users: &fakeUserRepository{
 				byUsernameFunc: func(string) (user.User, error) {
 					return user.User{
 						ID:           uuid.NewV7(),
@@ -286,7 +189,7 @@ func TestHandler_HandlePostLoginInvalidCredentials(t *testing.T) {
 func TestHandler_HandlePostLoginUserStoreError(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
 
-	h.users = &fakeUserStore{
+	h.users = &fakeUserRepository{
 		byUsernameFunc: func(string) (user.User, error) {
 			return user.User{}, errors.New("database error")
 		},
@@ -319,7 +222,7 @@ func TestHandler_HandlePostLoginSessionError(t *testing.T) {
 
 	h := newTestHandler(&fakeEndpointService{})
 
-	h.users = &fakeUserStore{
+	h.users = &fakeUserRepository{
 		byUsernameFunc: func(string) (user.User, error) {
 			return user.User{
 				ID:           userID,
@@ -354,98 +257,5 @@ func TestHandler_HandlePostLoginSessionError(t *testing.T) {
 
 	if got, want := recorder.Code, http.StatusInternalServerError; got != want {
 		t.Errorf("handlePostLogin() status = %d, want %d", got, want)
-	}
-}
-
-func TestHandler_HandlePostLogout(t *testing.T) {
-	h := newTestHandler(&fakeEndpointService{})
-
-	deleted := false
-
-	h.sessions = &fakeSessionService{
-		deleteFunc: func(token string) error {
-			if got, want := token, "session-token"; got != want {
-				t.Errorf("Delete(%q), want %q", got, want)
-			}
-
-			deleted = true
-			return nil
-		},
-	}
-
-	form := url.Values{}
-	form.Set("csrf_token", "csrf")
-
-	req := httptest.NewRequest(http.MethodPost, "/logout", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	req.AddCookie(&http.Cookie{
-		Name:  csrfCookieName,
-		Value: "csrf",
-	})
-
-	req.AddCookie(&http.Cookie{
-		Name:  sessionCookieName,
-		Value: "session-token",
-	})
-
-	recorder := httptest.NewRecorder()
-
-	h.handlePostLogout(recorder, req)
-
-	if got, want := recorder.Code, http.StatusSeeOther; got != want {
-		t.Errorf("handlePostLogout() status = %d, want %d", got, want)
-	}
-
-	if got, want := recorder.Header().Get("Location"), "/login"; got != want {
-		t.Errorf("handlePostLogout() Location = %q, want %q", got, want)
-	}
-
-	if !deleted {
-		t.Error("handlePostLogout() did not delete session")
-	}
-
-	var sessionCookie *http.Cookie
-
-	for _, cookie := range recorder.Result().Cookies() {
-		if cookie.Name == sessionCookieName {
-			sessionCookie = cookie
-			break
-		}
-	}
-
-	if sessionCookie == nil {
-		t.Fatal("handlePostLogout() session cookie = nil, want cleared cookie")
-	}
-
-	if got, want := sessionCookie.MaxAge, -1; got != want {
-		t.Errorf("session cookie MaxAge = %d, want %d", got, want)
-	}
-}
-
-func TestHandler_HandlePostLogoutWithoutSession(t *testing.T) {
-	h := newTestHandler(&fakeEndpointService{})
-
-	form := url.Values{}
-	form.Set("csrf_token", "csrf")
-
-	req := httptest.NewRequest(http.MethodPost, "/logout", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	req.AddCookie(&http.Cookie{
-		Name:  csrfCookieName,
-		Value: "csrf",
-	})
-
-	recorder := httptest.NewRecorder()
-
-	h.handlePostLogout(recorder, req)
-
-	if got, want := recorder.Code, http.StatusSeeOther; got != want {
-		t.Errorf("handlePostLogout() status = %d, want %d", got, want)
-	}
-
-	if got, want := recorder.Header().Get("Location"), "/login"; got != want {
-		t.Errorf("handlePostLogout() Location = %q, want %q", got, want)
 	}
 }

@@ -1,7 +1,6 @@
 package web
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,7 +18,7 @@ func TestHandler_HandlePostUser(t *testing.T) {
 
 	var inserted user.User
 
-	h.users = &fakeUserStore{
+	h.users = &fakeUserRepository{
 		insertFunc: func(account user.User) error {
 			inserted = account
 			return nil
@@ -34,9 +33,15 @@ func TestHandler_HandlePostUser(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 	req.AddCookie(&http.Cookie{
 		Name:  csrfCookieName,
 		Value: "csrf",
+	})
+
+	req = withCurrentUser(req, user.User{
+		ID:   uuid.NewV7(),
+		Role: user.RoleAdmin,
 	})
 
 	recorder := httptest.NewRecorder()
@@ -102,7 +107,7 @@ func TestHandler_HandlePostUserInvalidInput(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newTestHandler(&fakeEndpointService{})
 
-			h.users = &fakeUserStore{
+			h.users = &fakeUserRepository{
 				listFunc: func() ([]user.User, error) {
 					return nil, nil
 				},
@@ -116,9 +121,16 @@ func TestHandler_HandlePostUserInvalidInput(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(form.Encode()))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 			req.AddCookie(&http.Cookie{
 				Name:  csrfCookieName,
 				Value: "csrf",
+			})
+
+			req = withCurrentUser(req, user.User{
+				ID:       uuid.NewV7(),
+				Username: "admin",
+				Role:     user.RoleAdmin,
 			})
 
 			recorder := httptest.NewRecorder()
@@ -135,7 +147,7 @@ func TestHandler_HandlePostUserInvalidInput(t *testing.T) {
 func TestHandler_HandlePostUserDuplicate(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
 
-	h.users = &fakeUserStore{
+	h.users = &fakeUserRepository{
 		insertFunc: func(user.User) error {
 			return user.ErrUserExists
 		},
@@ -152,9 +164,16 @@ func TestHandler_HandlePostUserDuplicate(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 	req.AddCookie(&http.Cookie{
 		Name:  csrfCookieName,
 		Value: "csrf",
+	})
+
+	req = withCurrentUser(req, user.User{
+		ID:       uuid.NewV7(),
+		Username: "admin",
+		Role:     user.RoleAdmin,
 	})
 
 	recorder := httptest.NewRecorder()
@@ -177,7 +196,7 @@ func TestHandler_HandleDeleteUserSelf(t *testing.T) {
 
 	called := false
 
-	h.users = &fakeUserStore{
+	h.users = &fakeUserRepository{
 		removeByIDFunc: func(uuid.UUID) error {
 			called = true
 			return nil
@@ -190,21 +209,16 @@ func TestHandler_HandleDeleteUserSelf(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/users/"+userID.String()+"/delete", strings.NewReader(form.Encode()))
 	req.SetPathValue("id", userID.String())
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 	req.AddCookie(&http.Cookie{
 		Name:  csrfCookieName,
 		Value: "csrf",
 	})
 
-	ctx := context.WithValue(
-		req.Context(),
-		currentUserKey,
-		user.User{
-			ID:   userID,
-			Role: user.RoleAdmin,
-		},
-	)
-
-	req = req.WithContext(ctx)
+	req = withCurrentUser(req, user.User{
+		ID:   userID,
+		Role: user.RoleAdmin,
+	})
 
 	recorder := httptest.NewRecorder()
 

@@ -12,8 +12,6 @@ import (
 	"github.com/sgrinan/signaldock/internal/endpoint"
 )
 
-// handler.handlePrometheusTargets
-
 func TestHandler_HandlePrometheusTargets(t *testing.T) {
 	tests := []struct {
 		name      string

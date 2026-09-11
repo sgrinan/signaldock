@@ -13,8 +13,6 @@ import (
 	"github.com/sgrinan/signaldock/internal/user"
 )
 
-// securityHeaders
-
 func TestSecurityHeaders(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -63,7 +61,7 @@ func TestHandler_RequireAuth(t *testing.T) {
 		name       string
 		cookie     *http.Cookie
 		sessions   sessionService
-		users      userStore
+		users      userRepository
 		wantStatus int
 		wantNext   bool
 		wantUser   bool
@@ -89,7 +87,7 @@ func TestHandler_RequireAuth(t *testing.T) {
 					}, nil
 				},
 			},
-			users: &fakeUserStore{
+			users: &fakeUserRepository{
 				byIDFunc: func(id uuid.UUID) (user.User, error) {
 					if got, want := id, userID; got != want {
 						t.Errorf("ByID(%v), want %v", got, want)
@@ -145,7 +143,7 @@ func TestHandler_RequireAuth(t *testing.T) {
 					}, nil
 				},
 			},
-			users: &fakeUserStore{
+			users: &fakeUserRepository{
 				byIDFunc: func(uuid.UUID) (user.User, error) {
 					return user.User{}, user.ErrUserNotFound
 				},
@@ -165,7 +163,7 @@ func TestHandler_RequireAuth(t *testing.T) {
 					}, nil
 				},
 			},
-			users: &fakeUserStore{
+			users: &fakeUserRepository{
 				byIDFunc: func(uuid.UUID) (user.User, error) {
 					return user.User{
 						ID:       userID,
@@ -275,7 +273,7 @@ func TestHandler_RequireAuthUserStoreError(t *testing.T) {
 		},
 	}
 
-	h.users = &fakeUserStore{
+	h.users = &fakeUserRepository{
 		byIDFunc: func(uuid.UUID) (user.User, error) {
 			return user.User{}, errors.New("database error")
 		},

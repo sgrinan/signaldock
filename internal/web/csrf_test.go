@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// generateCSRFToken
-
 func TestGenerateCSRFToken(t *testing.T) {
 	token, err := generateCSRFToken()
 	if err != nil {
@@ -25,8 +23,6 @@ func TestGenerateCSRFToken(t *testing.T) {
 		t.Error("generateCSRFToken() returned non-hexadecimal token")
 	}
 }
-
-// getCSRFToken
 
 func TestGetCSRFToken(t *testing.T) {
 	t.Run("creates_token", func(t *testing.T) {
@@ -118,8 +114,6 @@ func TestGetCSRFToken(t *testing.T) {
 		}
 	})
 }
-
-// validateCSRF
 
 func TestValidateCSRF(t *testing.T) {
 	tests := []struct {

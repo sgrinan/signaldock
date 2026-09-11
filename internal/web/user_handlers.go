@@ -35,7 +35,11 @@ func (h *handler) handleGetUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, _ := currentUser(r)
+	account, ok := currentUser(r)
+	if !ok {
+		http.Error(w, "failed to get current user", http.StatusInternalServerError)
+		return
+	}
 
 	data := usersPageData{
 		Users:       users,
@@ -105,82 +109,20 @@ func (h *handler) renderUsersError(w http.ResponseWriter, r *http.Request, messa
 		return
 	}
 
-	data := usersPageData{
-		Users:     users,
-		Error:     message,
-		CSRFToken: csrfToken,
-	}
-
-	h.renderStatus(w, http.StatusBadRequest, "users.html", data)
-}
-
-func (h *handler) handleDisableUser(w http.ResponseWriter, r *http.Request) {
-	if !validateCSRF(r) {
-		http.Error(w, "invalid CSRF token", http.StatusForbidden)
-		return
-	}
-
-	rawID := r.PathValue("id")
-
-	id, err := uuid.Parse(rawID)
-	if err != nil {
-		http.Error(w, "invalid user ID", http.StatusBadRequest)
-		return
-	}
-
 	account, ok := currentUser(r)
 	if !ok {
 		http.Error(w, "failed to get current user", http.StatusInternalServerError)
 		return
 	}
 
-	if id == account.ID {
-		http.Error(w, "cannot disable your own account", http.StatusBadRequest)
-		return
+	data := usersPageData{
+		Users:       users,
+		Error:       message,
+		CSRFToken:   csrfToken,
+		CurrentUser: account,
 	}
 
-	if err := h.users.SetDisabled(id, true); err != nil {
-		if errors.Is(err, user.ErrUserNotFound) {
-			http.Error(w, "user not found", http.StatusNotFound)
-			return
-		}
-
-		h.logger.Error("failed to disable user", "user_id", id, "error", err)
-
-		http.Error(w, "failed to disable user", http.StatusInternalServerError)
-		return
-	}
-
-	http.Redirect(w, r, "/users", http.StatusSeeOther)
-}
-
-func (h *handler) handleEnableUser(w http.ResponseWriter, r *http.Request) {
-	if !validateCSRF(r) {
-		http.Error(w, "invalid CSRF token", http.StatusForbidden)
-		return
-	}
-
-	rawID := r.PathValue("id")
-
-	id, err := uuid.Parse(rawID)
-	if err != nil {
-		http.Error(w, "invalid user ID", http.StatusBadRequest)
-		return
-	}
-
-	if err := h.users.SetDisabled(id, false); err != nil {
-		if errors.Is(err, user.ErrUserNotFound) {
-			http.Error(w, "user not found", http.StatusNotFound)
-			return
-		}
-
-		h.logger.Error("failed to enable user", "user_id", id, "error", err)
-
-		http.Error(w, "failed to enable user", http.StatusInternalServerError)
-		return
-	}
-
-	http.Redirect(w, r, "/users", http.StatusSeeOther)
+	h.renderStatus(w, http.StatusBadRequest, "users.html", data)
 }
 
 func (h *handler) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
