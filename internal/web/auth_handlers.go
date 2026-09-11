@@ -8,6 +8,8 @@ import (
 	"github.com/sgrinan/signaldock/internal/user"
 )
 
+const dummyPasswordHash = "$argon2id$v=19$m=19456,t=2,p=1$c2lnbmFsZG9jay1kdW1teQ$v3D9B8GwIeOloslWIQJpwV/ekXDf9WYmSY3rPoxUAA4"
+
 func (h *handler) handleGetLogin(w http.ResponseWriter, r *http.Request) {
 	csrfToken, err := getCSRFToken(w, r)
 	if err != nil {
@@ -36,12 +38,18 @@ func (h *handler) handlePostLogin(w http.ResponseWriter, r *http.Request) {
 	account, err := h.users.ByUsername(r.Context(), username)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
+			if _, err := auth.VerifyPassword(password, dummyPasswordHash); err != nil {
+				h.logger.Error("failed to verify dummy password", "error", err)
+
+				http.Error(w, "failed to sign in", http.StatusInternalServerError)
+				return
+			}
+
 			h.renderLoginError(w, r)
 			return
 		}
 
 		h.logger.Error("failed to get user", "error", err)
-
 		http.Error(w, "failed to sign in", http.StatusInternalServerError)
 		return
 	}
