@@ -12,9 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"uuid"
-
-	"github.com/sgrinan/signaldock/internal/auth"
 	"github.com/sgrinan/signaldock/internal/database"
 	"github.com/sgrinan/signaldock/internal/endpoint"
 	"github.com/sgrinan/signaldock/internal/session"
@@ -64,31 +61,8 @@ func run(logger *slog.Logger) error {
 
 	userRepository := user.NewRepository(pool)
 
-	users, err := userRepository.List()
-	if err != nil {
-		return fmt.Errorf("load users: %w", err)
-	}
-
-	if len(users) == 0 {
-		username := os.Getenv("SIGNALDOCK_ADMIN_USERNAME")
-		password := os.Getenv("SIGNALDOCK_ADMIN_PASSWORD")
-
-		if username == "" || password == "" {
-			return errors.New("initial admin credentials are required")
-		}
-
-		admin := user.User{
-			ID:           uuid.NewV7(),
-			Username:     username,
-			PasswordHash: auth.HashPassword(password),
-			Role:         user.RoleAdmin,
-		}
-
-		if err := userRepository.Insert(admin); err != nil {
-			return fmt.Errorf("create initial admin: %w", err)
-		}
-
-		logger.Info("initial admin created", "username", username)
+	if err := ensureInitialAdmin(userRepository, logger); err != nil {
+		return err
 	}
 
 	sessionRepository := session.NewRepository(pool)
