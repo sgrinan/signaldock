@@ -10,7 +10,7 @@ import (
 func refreshEndpointsOnStartup(service *endpoint.Service, logger *slog.Logger) error {
 	endpoints, err := service.List()
 	if err != nil {
-		return fmt.Errorf("load endpoints error = %w, want nil", err)
+		return fmt.Errorf("load endpoints: %w", err)
 	}
 
 	for _, ep := range endpoints {

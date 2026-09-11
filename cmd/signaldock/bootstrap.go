@@ -15,7 +15,7 @@ import (
 func ensureInitialAdmin(repository *user.Repository, logger *slog.Logger) error {
 	users, err := repository.List()
 	if err != nil {
-		return fmt.Errorf("load users error = %w, want nil", err)
+		return fmt.Errorf("load users: %w", err)
 	}
 
 	if len(users) != 0 {
@@ -37,7 +37,7 @@ func ensureInitialAdmin(repository *user.Repository, logger *slog.Logger) error 
 	}
 
 	if err := repository.Insert(admin); err != nil {
-		return fmt.Errorf("create initial admin error = %w, want nil", err)
+		return fmt.Errorf("create initial admin: %w", err)
 	}
 
 	logger.Info("initial admin created", "username", username)
