@@ -57,13 +57,19 @@ func VerifyPassword(password, encodedHash string) (bool, error) {
 	}
 
 	var (
-		memory      uint32
-		iterations  uint32
-		parallelism uint8
+		hashMemory      uint32
+		hashIterations  uint32
+		hashParallelism uint8
 	)
 
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &parallelism); err != nil {
+	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &hashMemory, &hashIterations, &hashParallelism); err != nil {
 		return false, fmt.Errorf("parse argon2 parameters: %w", err)
+	}
+
+	if hashMemory != memory ||
+		hashIterations != iterations ||
+		hashParallelism != parallelism {
+		return false, fmt.Errorf("unsupported argon2 parameters")
 	}
 
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
@@ -76,7 +82,7 @@ func VerifyPassword(password, encodedHash string) (bool, error) {
 		return false, fmt.Errorf("decode password hash: %w", err)
 	}
 
-	actualHash := argon2.IDKey([]byte(password), salt, iterations, memory, parallelism, uint32(len(expectedHash)))
+	actualHash := argon2.IDKey([]byte(password), salt, hashIterations, hashMemory, hashParallelism, uint32(len(expectedHash)))
 
 	return subtle.ConstantTimeCompare(actualHash, expectedHash) == 1, nil
 }

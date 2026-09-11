@@ -81,7 +81,7 @@ func TestValidateHost(t *testing.T) {
 	t.Run("public_ip", func(t *testing.T) {
 		const host = "8.8.8.8"
 
-		got, err := ValidateHost(host)
+		got, err := ValidateHost(t.Context(), host)
 		if err != nil {
 			t.Fatalf("ValidateHost(%q) returned unexpected error: %v", host, err)
 		}
@@ -100,7 +100,7 @@ func TestValidateHost(t *testing.T) {
 	t.Run("unsafe_ip", func(t *testing.T) {
 		const host = "127.0.0.1"
 
-		_, err := ValidateHost(host)
+		_, err := ValidateHost(t.Context(), host)
 
 		if !errors.Is(err, ErrUnsafeHost) {
 			t.Errorf("ValidateHost(%q) error = %v, want %v", host, err, ErrUnsafeHost)
@@ -110,7 +110,7 @@ func TestValidateHost(t *testing.T) {
 	t.Run("unmaps_ipv4", func(t *testing.T) {
 		const host = "::ffff:8.8.8.8"
 
-		got, err := ValidateHost(host)
+		got, err := ValidateHost(t.Context(), host)
 		if err != nil {
 			t.Fatalf("ValidateHost(%q) error = %v, want nil", host, err)
 		}
@@ -189,7 +189,7 @@ func TestValidateHostWithLookup(t *testing.T) {
 				return append([]netip.Addr(nil), tt.resolved...), tt.lookupErr
 			}
 
-			got, err := validateHost(host, lookup)
+			got, err := validateHost(t.Context(), host, lookup)
 
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) {

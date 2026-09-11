@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/netip"
@@ -17,9 +18,11 @@ import (
 
 func TestService_Add(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, checks := newTestService()
 
-		got, err := s.Add("HTTPS://EXAMPLE.COM:443")
+		got, err := s.Add(ctx, "HTTPS://EXAMPLE.COM:443")
 		if err != nil {
 			t.Fatalf("Add() error = %v, want nil", err)
 		}
@@ -40,7 +43,7 @@ func TestService_Add(t *testing.T) {
 			t.Error("Add().LastCheck.TLS.Valid = false, want true")
 		}
 
-		stored, err := repository.ByID(got.ID)
+		stored, err := repository.ByID(ctx, got.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) error = %v, want nil", got.ID, err)
 		}
@@ -62,11 +65,13 @@ func TestService_Add(t *testing.T) {
 	})
 
 	t.Run("invalid_url", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, _ := newTestService()
 
 		const rawURL = "ftp://example.com"
 
-		got, err := s.Add(rawURL)
+		got, err := s.Add(ctx, rawURL)
 
 		if !errors.Is(err, ErrUnsupportedScheme) {
 			t.Errorf("Add(%q) error = %v, want %v", rawURL, err, ErrUnsupportedScheme)
@@ -76,7 +81,7 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("Add(%q) = %+v, want zero Endpoint", rawURL, got)
 		}
 
-		endpoints, err := repository.List()
+		endpoints, err := repository.List(ctx)
 		if err != nil {
 			t.Fatalf("List() error = %v, want nil", err)
 		}
@@ -87,15 +92,17 @@ func TestService_Add(t *testing.T) {
 	})
 
 	t.Run("unsafe_host", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, _ := newTestService()
 
-		s.validateHost = func(string) ([]netip.Addr, error) {
+		s.validateHost = func(context.Context, string) ([]netip.Addr, error) {
 			return nil, probe.ErrUnsafeHost
 		}
 
 		const rawURL = "https://example.com"
 
-		got, err := s.Add(rawURL)
+		got, err := s.Add(ctx, rawURL)
 
 		if !errors.Is(err, ErrUnsafeHost) {
 			t.Errorf("Add(%q) error = %v, want %v", rawURL, err, ErrUnsafeHost)
@@ -105,7 +112,7 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("Add(%q) = %+v, want zero Endpoint", rawURL, got)
 		}
 
-		endpoints, err := repository.List()
+		endpoints, err := repository.List(ctx)
 		if err != nil {
 			t.Fatalf("List() error = %v, want nil", err)
 		}
@@ -116,15 +123,17 @@ func TestService_Add(t *testing.T) {
 	})
 
 	t.Run("host_check_error_stores_failed_result", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, checks := newTestService()
 
-		s.validateHost = func(string) ([]netip.Addr, error) {
+		s.validateHost = func(context.Context, string) ([]netip.Addr, error) {
 			return nil, probe.ErrNoResolvedAddresses
 		}
 
 		const rawURL = "https://example.com"
 
-		got, err := s.Add(rawURL)
+		got, err := s.Add(ctx, rawURL)
 
 		var checkErr CheckError
 		if !errors.As(err, &checkErr) {
@@ -151,7 +160,7 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("Add(%q).LastCheck.TLS.Enabled = false, want true", rawURL)
 		}
 
-		stored, err := repository.ByID(got.ID)
+		stored, err := repository.ByID(ctx, got.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) error = %v, want nil", got.ID, err)
 		}
@@ -173,6 +182,8 @@ func TestService_Add(t *testing.T) {
 	})
 
 	t.Run("check_error_stores_result", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, checks := newTestService()
 
 		httpErr := errors.New("HTTP failed")
@@ -185,7 +196,7 @@ func TestService_Add(t *testing.T) {
 
 		const rawURL = "https://example.com"
 
-		got, err := s.Add(rawURL)
+		got, err := s.Add(ctx, rawURL)
 
 		var checkErr CheckError
 		if !errors.As(err, &checkErr) {
@@ -196,7 +207,7 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("errors.Is(Add(%q) error, httpErr) = false, want true", rawURL)
 		}
 
-		stored, err := repository.ByID(got.ID)
+		stored, err := repository.ByID(ctx, got.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) error = %v, want nil", got.ID, err)
 		}
@@ -218,21 +229,23 @@ func TestService_Add(t *testing.T) {
 	})
 
 	t.Run("duplicate", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, checks := newTestService()
 
 		const rawURL = "https://example.com"
 
-		first, err := s.Add(rawURL)
+		first, err := s.Add(ctx, rawURL)
 		if err != nil {
 			t.Fatalf("first Add(%q) error = %v, want nil", rawURL, err)
 		}
 
-		_, err = s.Add(rawURL)
+		_, err = s.Add(ctx, rawURL)
 		if !errors.Is(err, ErrEndpointExists) {
 			t.Errorf("second Add(%q) error = %v, want %v", rawURL, err, ErrEndpointExists)
 		}
 
-		endpoints, err := repository.List()
+		endpoints, err := repository.List(ctx)
 		if err != nil {
 			t.Fatalf("List() error = %v, want nil", err)
 		}
@@ -241,7 +254,7 @@ func TestService_Add(t *testing.T) {
 			t.Errorf("len(List()) = %d, want 1", got)
 		}
 
-		stored, err := repository.ByID(first.ID)
+		stored, err := repository.ByID(ctx, first.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) error = %v, want nil", first.ID, err)
 		}
@@ -291,6 +304,8 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 		}, nil
 	}
 
+	ctx := t.Context()
+
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 
@@ -300,7 +315,7 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			_, err := s.Add("https://example.com")
+			_, err := s.Add(ctx, "https://example.com")
 			errs <- err
 		}()
 	}
@@ -332,7 +347,7 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 		t.Errorf("duplicate Add() calls = %d, want %d", got, want)
 	}
 
-	endpoints, err := repository.List()
+	endpoints, err := repository.List(ctx)
 	if err != nil {
 		t.Fatalf("List() error = %v, want nil", err)
 	}

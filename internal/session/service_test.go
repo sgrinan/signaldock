@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -9,12 +10,14 @@ import (
 )
 
 func TestService_Create(t *testing.T) {
+	ctx := t.Context()
+
 	userID := uuid.NewV7()
 
 	var inserted Session
 
 	repository := &fakeSessionRepository{
-		insertFunc: func(session Session) error {
+		insertFunc: func(ctx context.Context, session Session) error {
 			inserted = session
 			return nil
 		},
@@ -22,7 +25,7 @@ func TestService_Create(t *testing.T) {
 
 	service := NewService(repository)
 
-	token, err := service.Create(userID)
+	token, err := service.Create(ctx, userID)
 	if err != nil {
 		t.Fatalf("Create(%v) error = %v, want nil", userID, err)
 	}
@@ -45,6 +48,8 @@ func TestService_Create(t *testing.T) {
 }
 
 func TestService_Validate(t *testing.T) {
+	ctx := t.Context()
+
 	token := GenerateToken()
 
 	want := Session{
@@ -54,7 +59,7 @@ func TestService_Validate(t *testing.T) {
 	}
 
 	repository := &fakeSessionRepository{
-		byTokenHashFunc: func(tokenHash string) (Session, error) {
+		byTokenHashFunc: func(ctx context.Context, tokenHash string) (Session, error) {
 			if tokenHash != want.TokenHash {
 				t.Errorf("ByTokenHash(%q), want %q", tokenHash, want.TokenHash)
 			}
@@ -65,7 +70,7 @@ func TestService_Validate(t *testing.T) {
 
 	service := NewService(repository)
 
-	got, err := service.Validate(token)
+	got, err := service.Validate(ctx, token)
 	if err != nil {
 		t.Fatalf("Validate(token) error = %v, want nil", err)
 	}
@@ -76,6 +81,8 @@ func TestService_Validate(t *testing.T) {
 }
 
 func TestService_ValidateExpired(t *testing.T) {
+	ctx := t.Context()
+
 	token := GenerateToken()
 	tokenHash := HashToken(token)
 
@@ -88,10 +95,10 @@ func TestService_ValidateExpired(t *testing.T) {
 	deleted := false
 
 	repository := &fakeSessionRepository{
-		byTokenHashFunc: func(string) (Session, error) {
+		byTokenHashFunc: func(context.Context, string) (Session, error) {
 			return session, nil
 		},
-		deleteFunc: func(got string) error {
+		deleteFunc: func(ctx context.Context, got string) error {
 			if got != tokenHash {
 				t.Errorf("Delete(%q), want %q", got, tokenHash)
 			}
@@ -103,7 +110,7 @@ func TestService_ValidateExpired(t *testing.T) {
 
 	service := NewService(repository)
 
-	_, err := service.Validate(token)
+	_, err := service.Validate(ctx, token)
 
 	if !errors.Is(err, ErrSessionExpired) {
 		t.Errorf("Validate(token) error = %v, want ErrSessionExpired", err)
@@ -114,18 +121,20 @@ func TestService_ValidateExpired(t *testing.T) {
 	}
 }
 
-func TestService_ValidateStoreError(t *testing.T) {
+func TestService_ValidateRepositoryError(t *testing.T) {
+	ctx := t.Context()
+
 	wantErr := errors.New("database error")
 
 	repository := &fakeSessionRepository{
-		byTokenHashFunc: func(string) (Session, error) {
+		byTokenHashFunc: func(context.Context, string) (Session, error) {
 			return Session{}, wantErr
 		},
 	}
 
 	service := NewService(repository)
 
-	_, err := service.Validate("token")
+	_, err := service.Validate(ctx, "token")
 
 	if !errors.Is(err, wantErr) {
 		t.Errorf("Validate(token) error = %v, want wrapped %v", err, wantErr)
@@ -133,11 +142,13 @@ func TestService_ValidateStoreError(t *testing.T) {
 }
 
 func TestService_Delete(t *testing.T) {
+	ctx := t.Context()
+
 	token := GenerateToken()
 	wantHash := HashToken(token)
 
 	repository := &fakeSessionRepository{
-		deleteFunc: func(tokenHash string) error {
+		deleteFunc: func(ctx context.Context, tokenHash string) error {
 			if tokenHash != wantHash {
 				t.Errorf("Delete(%q), want %q", tokenHash, wantHash)
 			}
@@ -148,21 +159,23 @@ func TestService_Delete(t *testing.T) {
 
 	service := NewService(repository)
 
-	if err := service.Delete(token); err != nil {
+	if err := service.Delete(ctx, token); err != nil {
 		t.Fatalf("Delete(token) error = %v, want nil", err)
 	}
 }
 
 func TestService_DeleteNotFound(t *testing.T) {
+	ctx := t.Context()
+
 	repository := &fakeSessionRepository{
-		deleteFunc: func(string) error {
+		deleteFunc: func(context.Context, string) error {
 			return ErrSessionNotFound
 		},
 	}
 
 	service := NewService(repository)
 
-	if err := service.Delete("token"); err != nil {
+	if err := service.Delete(ctx, "token"); err != nil {
 		t.Errorf("Delete(token) error = %v, want nil", err)
 	}
 }

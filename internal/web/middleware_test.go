@@ -77,7 +77,7 @@ func TestHandler_RequireAuth(t *testing.T) {
 				Value: "session-token",
 			},
 			sessions: &fakeSessionService{
-				validateFunc: func(token string) (session.Session, error) {
+				validateFunc: func(ctx context.Context, token string) (session.Session, error) {
 					if got, want := token, "session-token"; got != want {
 						t.Errorf("Validate(%q), want %q", got, want)
 					}
@@ -88,7 +88,7 @@ func TestHandler_RequireAuth(t *testing.T) {
 				},
 			},
 			users: &fakeUserRepository{
-				byIDFunc: func(id uuid.UUID) (user.User, error) {
+				byIDFunc: func(ctx context.Context, id uuid.UUID) (user.User, error) {
 					if got, want := id, userID; got != want {
 						t.Errorf("ByID(%v), want %v", got, want)
 					}
@@ -111,7 +111,7 @@ func TestHandler_RequireAuth(t *testing.T) {
 				Value: "session-token",
 			},
 			sessions: &fakeSessionService{
-				validateFunc: func(string) (session.Session, error) {
+				validateFunc: func(context.Context, string) (session.Session, error) {
 					return session.Session{}, session.ErrSessionNotFound
 				},
 			},
@@ -124,7 +124,7 @@ func TestHandler_RequireAuth(t *testing.T) {
 				Value: "session-token",
 			},
 			sessions: &fakeSessionService{
-				validateFunc: func(string) (session.Session, error) {
+				validateFunc: func(context.Context, string) (session.Session, error) {
 					return session.Session{}, session.ErrSessionExpired
 				},
 			},
@@ -137,14 +137,14 @@ func TestHandler_RequireAuth(t *testing.T) {
 				Value: "session-token",
 			},
 			sessions: &fakeSessionService{
-				validateFunc: func(string) (session.Session, error) {
+				validateFunc: func(context.Context, string) (session.Session, error) {
 					return session.Session{
 						UserID: userID,
 					}, nil
 				},
 			},
 			users: &fakeUserRepository{
-				byIDFunc: func(uuid.UUID) (user.User, error) {
+				byIDFunc: func(context.Context, uuid.UUID) (user.User, error) {
 					return user.User{}, user.ErrUserNotFound
 				},
 			},
@@ -157,14 +157,14 @@ func TestHandler_RequireAuth(t *testing.T) {
 				Value: "session-token",
 			},
 			sessions: &fakeSessionService{
-				validateFunc: func(string) (session.Session, error) {
+				validateFunc: func(context.Context, string) (session.Session, error) {
 					return session.Session{
 						UserID: userID,
 					}, nil
 				},
 			},
 			users: &fakeUserRepository{
-				byIDFunc: func(uuid.UUID) (user.User, error) {
+				byIDFunc: func(context.Context, uuid.UUID) (user.User, error) {
 					return user.User{
 						ID:       userID,
 						Username: "viewer",
@@ -238,7 +238,7 @@ func TestHandler_RequireAuthSessionError(t *testing.T) {
 
 	h := newTestHandler(&fakeEndpointService{})
 	h.sessions = &fakeSessionService{
-		validateFunc: func(string) (session.Session, error) {
+		validateFunc: func(context.Context, string) (session.Session, error) {
 			return session.Session{}, wantErr
 		},
 	}
@@ -266,7 +266,7 @@ func TestHandler_RequireAuthUserRepositoryError(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
 
 	h.sessions = &fakeSessionService{
-		validateFunc: func(string) (session.Session, error) {
+		validateFunc: func(context.Context, string) (session.Session, error) {
 			return session.Session{
 				UserID: userID,
 			}, nil
@@ -274,7 +274,7 @@ func TestHandler_RequireAuthUserRepositoryError(t *testing.T) {
 	}
 
 	h.users = &fakeUserRepository{
-		byIDFunc: func(uuid.UUID) (user.User, error) {
+		byIDFunc: func(context.Context, uuid.UUID) (user.User, error) {
 			return user.User{}, errors.New("database error")
 		},
 	}

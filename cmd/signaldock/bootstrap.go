@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,8 +13,8 @@ import (
 	"github.com/sgrinan/signaldock/internal/user"
 )
 
-func ensureInitialAdmin(repository *user.Repository, logger *slog.Logger) error {
-	users, err := repository.List()
+func ensureInitialAdmin(ctx context.Context, repository *user.Repository, logger *slog.Logger) error {
+	users, err := repository.List(ctx)
 	if err != nil {
 		return fmt.Errorf("load users: %w", err)
 	}
@@ -36,7 +37,7 @@ func ensureInitialAdmin(repository *user.Repository, logger *slog.Logger) error 
 		Role:         user.RoleAdmin,
 	}
 
-	if err := repository.Insert(admin); err != nil {
+	if err := repository.Insert(ctx, admin); err != nil {
 		return fmt.Errorf("create initial admin: %w", err)
 	}
 

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -55,7 +56,7 @@ func TestHandler_HandlePrometheusTargets(t *testing.T) {
 			}
 
 			service := &fakeEndpointService{
-				listFunc: func() ([]endpoint.Endpoint, error) {
+				listFunc: func(context.Context) ([]endpoint.Endpoint, error) {
 					return tt.endpoints, nil
 				},
 			}

@@ -33,7 +33,7 @@ func (h *handler) handlePostLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
-	account, err := h.users.ByUsername(username)
+	account, err := h.users.ByUsername(r.Context(), username)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
 			h.renderLoginError(w, r)
@@ -59,7 +59,7 @@ func (h *handler) handlePostLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.sessions.Create(account.ID)
+	token, err := h.sessions.Create(r.Context(), account.ID)
 	if err != nil {
 		h.logger.Error("failed to create session", "user_id", account.ID, "error", err)
 
@@ -67,7 +67,7 @@ func (h *handler) handlePostLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setSessionCookie(w, token)
+	setSessionCookie(w, r, token)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -98,7 +98,7 @@ func (h *handler) handlePostLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
 		if errors.Is(err, http.ErrNoCookie) {
-			clearSessionCookie(w)
+			clearSessionCookie(w, r)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
@@ -107,14 +107,14 @@ func (h *handler) handlePostLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.sessions.Delete(cookie.Value); err != nil {
+	if err := h.sessions.Delete(r.Context(), cookie.Value); err != nil {
 		h.logger.Error("failed to delete session", "error", err)
 
 		http.Error(w, "failed to sign out", http.StatusInternalServerError)
 		return
 	}
 
-	clearSessionCookie(w)
+	clearSessionCookie(w, r)
 
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }

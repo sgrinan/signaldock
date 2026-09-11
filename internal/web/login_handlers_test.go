@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -39,7 +40,7 @@ func TestHandler_HandlePostLogin(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
 
 	h.users = &fakeUserRepository{
-		byUsernameFunc: func(username string) (user.User, error) {
+		byUsernameFunc: func(ctx context.Context, username string) (user.User, error) {
 			if got, want := username, "admin"; got != want {
 				t.Errorf("ByUsername(%q), want %q", got, want)
 			}
@@ -54,9 +55,9 @@ func TestHandler_HandlePostLogin(t *testing.T) {
 	}
 
 	h.sessions = &fakeSessionService{
-		createFunc: func(id uuid.UUID) (string, error) {
+		createFunc: func(_ context.Context, id uuid.UUID) (string, error) {
 			if got, want := id, userID; got != want {
-				t.Errorf("Create(%v), want %v", got, want)
+				t.Errorf("Create() user ID = %v, want %v", got, want)
 			}
 
 			return "session-token", nil
@@ -68,11 +69,7 @@ func TestHandler_HandlePostLogin(t *testing.T) {
 	form.Set("password", password)
 	form.Set("csrf_token", "csrf")
 
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/login",
-		strings.NewReader(form.Encode()),
-	)
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{
 		Name:  csrfCookieName,
@@ -119,7 +116,7 @@ func TestHandler_HandlePostLoginInvalidCredentials(t *testing.T) {
 		{
 			name: "user_not_found",
 			users: &fakeUserRepository{
-				byUsernameFunc: func(string) (user.User, error) {
+				byUsernameFunc: func(context.Context, string) (user.User, error) {
 					return user.User{}, user.ErrUserNotFound
 				},
 			},
@@ -127,7 +124,7 @@ func TestHandler_HandlePostLoginInvalidCredentials(t *testing.T) {
 		{
 			name: "wrong_password",
 			users: &fakeUserRepository{
-				byUsernameFunc: func(string) (user.User, error) {
+				byUsernameFunc: func(context.Context, string) (user.User, error) {
 					return user.User{
 						ID:           uuid.NewV7(),
 						Username:     "admin",
@@ -140,7 +137,7 @@ func TestHandler_HandlePostLoginInvalidCredentials(t *testing.T) {
 		{
 			name: "disabled_user",
 			users: &fakeUserRepository{
-				byUsernameFunc: func(string) (user.User, error) {
+				byUsernameFunc: func(context.Context, string) (user.User, error) {
 					return user.User{
 						ID:           uuid.NewV7(),
 						Username:     "admin",
@@ -190,7 +187,7 @@ func TestHandler_HandlePostLoginUserRepositoryError(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
 
 	h.users = &fakeUserRepository{
-		byUsernameFunc: func(string) (user.User, error) {
+		byUsernameFunc: func(context.Context, string) (user.User, error) {
 			return user.User{}, errors.New("database error")
 		},
 	}
@@ -223,7 +220,7 @@ func TestHandler_HandlePostLoginSessionError(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
 
 	h.users = &fakeUserRepository{
-		byUsernameFunc: func(string) (user.User, error) {
+		byUsernameFunc: func(context.Context, string) (user.User, error) {
 			return user.User{
 				ID:           userID,
 				Username:     "admin",
@@ -234,7 +231,7 @@ func TestHandler_HandlePostLoginSessionError(t *testing.T) {
 	}
 
 	h.sessions = &fakeSessionService{
-		createFunc: func(uuid.UUID) (string, error) {
+		createFunc: func(context.Context, uuid.UUID) (string, error) {
 			return "", errors.New("database error")
 		},
 	}

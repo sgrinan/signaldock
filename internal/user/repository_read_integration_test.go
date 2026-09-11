@@ -8,6 +8,8 @@ import (
 )
 
 func TestRepository_List(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	users := []User{
@@ -26,12 +28,12 @@ func TestRepository_List(t *testing.T) {
 	}
 
 	for _, user := range users {
-		if err := repository.Insert(user); err != nil {
+		if err := repository.Insert(ctx, user); err != nil {
 			t.Fatalf("Insert() error = %v, want nil", err)
 		}
 	}
 
-	got, err := repository.List()
+	got, err := repository.List(ctx)
 	if err != nil {
 		t.Fatalf("List() error = %v, want nil", err)
 	}
@@ -68,6 +70,8 @@ func TestRepository_List(t *testing.T) {
 }
 
 func TestRepository_ByID(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	want := User{
@@ -78,11 +82,11 @@ func TestRepository_ByID(t *testing.T) {
 		Disabled:     true,
 	}
 
-	if err := repository.Insert(want); err != nil {
+	if err := repository.Insert(ctx, want); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	got, err := repository.ByID(want.ID)
+	got, err := repository.ByID(ctx, want.ID)
 	if err != nil {
 		t.Fatalf("ByID() error = %v, want nil", err)
 	}
@@ -109,9 +113,11 @@ func TestRepository_ByID(t *testing.T) {
 }
 
 func TestRepository_ByIDNotFound(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
-	_, err := repository.ByID(uuid.NewV7())
+	_, err := repository.ByID(ctx, uuid.NewV7())
 
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("ByID() error = %v, want ErrUserNotFound", err)
@@ -119,6 +125,8 @@ func TestRepository_ByIDNotFound(t *testing.T) {
 }
 
 func TestRepository_ByUsername(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	want := User{
@@ -128,11 +136,11 @@ func TestRepository_ByUsername(t *testing.T) {
 		Role:         RoleAdmin,
 	}
 
-	if err := repository.Insert(want); err != nil {
+	if err := repository.Insert(ctx, want); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	got, err := repository.ByUsername(want.Username)
+	got, err := repository.ByUsername(ctx, want.Username)
 	if err != nil {
 		t.Fatalf("ByUsername() error = %v, want nil", err)
 	}
@@ -155,9 +163,11 @@ func TestRepository_ByUsername(t *testing.T) {
 }
 
 func TestRepository_ByUsernameNotFound(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
-	_, err := repository.ByUsername("missing")
+	_, err := repository.ByUsername(ctx, "missing")
 
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("ByUsername() error = %v, want ErrUserNotFound", err)

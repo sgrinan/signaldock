@@ -20,7 +20,7 @@ func (h *handler) handleGetIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	endpoints, err := h.endpoints.List()
+	endpoints, err := h.endpoints.List(r.Context())
 	if err != nil {
 		h.logger.Error("failed to list endpoints", "error", err)
 
@@ -67,7 +67,7 @@ func (h *handler) handlePostEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	rawURL := r.PostFormValue("url")
 
-	added, err := h.endpoints.Add(rawURL)
+	added, err := h.endpoints.Add(r.Context(), rawURL)
 
 	var checkErr endpoint.CheckError
 
@@ -146,7 +146,7 @@ func (h *handler) handleGetEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ep, err := h.endpoints.ByID(id)
+	ep, err := h.endpoints.ByID(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, endpoint.ErrEndpointNotFound) {
 			http.Error(w, "endpoint not found", http.StatusNotFound)
@@ -210,7 +210,7 @@ func (h *handler) handleDeleteEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.endpoints.RemoveByID(id); err != nil {
+	if err := h.endpoints.RemoveByID(r.Context(), id); err != nil {
 		if errors.Is(err, endpoint.ErrEndpointNotFound) {
 			http.Error(w, "endpoint not found", http.StatusNotFound)
 			return
@@ -241,7 +241,7 @@ func (h *handler) handleRefreshEndpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	check, err := h.endpoints.Refresh(id)
+	check, err := h.endpoints.Refresh(r.Context(), id)
 
 	var checkErr endpoint.CheckError
 

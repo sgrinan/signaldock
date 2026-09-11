@@ -61,14 +61,14 @@ func run(logger *slog.Logger) error {
 
 	userRepository := user.NewRepository(pool)
 
-	if err := ensureInitialAdmin(userRepository, logger); err != nil {
+	if err := ensureInitialAdmin(ctx, userRepository, logger); err != nil {
 		return err
 	}
 
 	sessionRepository := session.NewRepository(pool)
 	sessionService := session.NewService(sessionRepository)
 
-	if err := refreshEndpointsOnStartup(endpointService, logger); err != nil {
+	if err := refreshEndpointsOnStartup(ctx, endpointService, logger); err != nil {
 		return err
 	}
 

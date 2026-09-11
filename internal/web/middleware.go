@@ -35,12 +35,12 @@ func (h *handler) requireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		session, err := h.sessions.Validate(cookie.Value)
+		session, err := h.sessions.Validate(r.Context(), cookie.Value)
 		if err != nil {
 			if errors.Is(err, sessionpkg.ErrSessionNotFound) ||
 				errors.Is(err, sessionpkg.ErrSessionExpired) {
 
-				clearSessionCookie(w)
+				clearSessionCookie(w, r)
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
 				return
 			}
@@ -51,10 +51,10 @@ func (h *handler) requireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		account, err := h.users.ByID(session.UserID)
+		account, err := h.users.ByID(r.Context(), session.UserID)
 		if err != nil {
 			if errors.Is(err, user.ErrUserNotFound) {
-				clearSessionCookie(w)
+				clearSessionCookie(w, r)
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
 				return
 			}
@@ -66,11 +66,11 @@ func (h *handler) requireAuth(next http.Handler) http.Handler {
 		}
 
 		if account.Disabled {
-			if err := h.sessions.Delete(cookie.Value); err != nil {
+			if err := h.sessions.Delete(r.Context(), cookie.Value); err != nil {
 				h.logger.Warn("failed to delete disabled user session", "user_id", account.ID, "error", err)
 			}
 
-			clearSessionCookie(w)
+			clearSessionCookie(w, r)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}

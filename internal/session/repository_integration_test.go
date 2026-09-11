@@ -7,6 +7,8 @@ import (
 )
 
 func TestRepository_Insert(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 	userID := createTestUser(t, repository)
 
@@ -16,11 +18,11 @@ func TestRepository_Insert(t *testing.T) {
 		ExpiresAt: time.Now().Add(time.Hour).Truncate(time.Microsecond),
 	}
 
-	if err := repository.Insert(want); err != nil {
+	if err := repository.Insert(ctx, want); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	got, err := repository.ByTokenHash(want.TokenHash)
+	got, err := repository.ByTokenHash(ctx, want.TokenHash)
 	if err != nil {
 		t.Fatalf("ByTokenHash(%q) error = %v, want nil", want.TokenHash, err)
 	}
@@ -43,6 +45,8 @@ func TestRepository_Insert(t *testing.T) {
 }
 
 func TestRepository_InsertDuplicate(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 	userID := createTestUser(t, repository)
 
@@ -52,11 +56,11 @@ func TestRepository_InsertDuplicate(t *testing.T) {
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
-	if err := repository.Insert(session); err != nil {
+	if err := repository.Insert(ctx, session); err != nil {
 		t.Fatalf("first Insert() error = %v, want nil", err)
 	}
 
-	err := repository.Insert(session)
+	err := repository.Insert(ctx, session)
 
 	if !errors.Is(err, ErrSessionExists) {
 		t.Errorf("second Insert() error = %v, want ErrSessionExists", err)
@@ -64,6 +68,8 @@ func TestRepository_InsertDuplicate(t *testing.T) {
 }
 
 func TestRepository_ByTokenHash(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 	userID := createTestUser(t, repository)
 
@@ -73,11 +79,11 @@ func TestRepository_ByTokenHash(t *testing.T) {
 		ExpiresAt: time.Now().Add(time.Hour).Truncate(time.Microsecond),
 	}
 
-	if err := repository.Insert(want); err != nil {
+	if err := repository.Insert(ctx, want); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	got, err := repository.ByTokenHash(want.TokenHash)
+	got, err := repository.ByTokenHash(ctx, want.TokenHash)
 	if err != nil {
 		t.Fatalf("ByTokenHash(%q) error = %v, want nil", want.TokenHash, err)
 	}
@@ -100,9 +106,11 @@ func TestRepository_ByTokenHash(t *testing.T) {
 }
 
 func TestRepository_ByTokenHashNotFound(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
-	_, err := repository.ByTokenHash("missing-token-hash")
+	_, err := repository.ByTokenHash(ctx, "missing-token-hash")
 
 	if !errors.Is(err, ErrSessionNotFound) {
 		t.Errorf("ByTokenHash(%q) error = %v, want ErrSessionNotFound", "missing-token-hash", err)
@@ -110,6 +118,8 @@ func TestRepository_ByTokenHashNotFound(t *testing.T) {
 }
 
 func TestRepository_Delete(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 	userID := createTestUser(t, repository)
 
@@ -119,15 +129,15 @@ func TestRepository_Delete(t *testing.T) {
 		ExpiresAt: time.Now().Add(time.Hour).Truncate(time.Microsecond),
 	}
 
-	if err := repository.Insert(session); err != nil {
+	if err := repository.Insert(ctx, session); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	if err := repository.Delete(session.TokenHash); err != nil {
+	if err := repository.Delete(ctx, session.TokenHash); err != nil {
 		t.Fatalf("Delete(%q) error = %v, want nil", session.TokenHash, err)
 	}
 
-	_, err := repository.ByTokenHash(session.TokenHash)
+	_, err := repository.ByTokenHash(ctx, session.TokenHash)
 
 	if !errors.Is(err, ErrSessionNotFound) {
 		t.Errorf("ByTokenHash(%q) after Delete() error = %v, want ErrSessionNotFound", session.TokenHash, err)
@@ -135,9 +145,11 @@ func TestRepository_Delete(t *testing.T) {
 }
 
 func TestRepository_DeleteNotFound(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
-	err := repository.Delete("missing-token-hash")
+	err := repository.Delete(ctx, "missing-token-hash")
 
 	if !errors.Is(err, ErrSessionNotFound) {
 		t.Errorf("Delete(%q) error = %v, want ErrSessionNotFound", "missing-token-hash", err)
@@ -145,6 +157,8 @@ func TestRepository_DeleteNotFound(t *testing.T) {
 }
 
 func TestRepository_DeleteExpired(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 	userID := createTestUser(t, repository)
 
@@ -160,24 +174,24 @@ func TestRepository_DeleteExpired(t *testing.T) {
 		ExpiresAt: time.Now().Add(time.Hour).Truncate(time.Microsecond),
 	}
 
-	if err := repository.Insert(expired); err != nil {
+	if err := repository.Insert(ctx, expired); err != nil {
 		t.Fatalf("Insert(expired) error = %v, want nil", err)
 	}
 
-	if err := repository.Insert(active); err != nil {
+	if err := repository.Insert(ctx, active); err != nil {
 		t.Fatalf("Insert(active) error = %v, want nil", err)
 	}
 
-	if err := repository.DeleteExpired(); err != nil {
+	if err := repository.DeleteExpired(ctx); err != nil {
 		t.Fatalf("DeleteExpired() error = %v, want nil", err)
 	}
 
-	_, err := repository.ByTokenHash(expired.TokenHash)
+	_, err := repository.ByTokenHash(ctx, expired.TokenHash)
 	if !errors.Is(err, ErrSessionNotFound) {
 		t.Errorf("ByTokenHash(%q) error = %v, want ErrSessionNotFound", expired.TokenHash, err)
 	}
 
-	got, err := repository.ByTokenHash(active.TokenHash)
+	got, err := repository.ByTokenHash(ctx, active.TokenHash)
 	if err != nil {
 		t.Fatalf("ByTokenHash(%q) error = %v, want nil", active.TokenHash, err)
 	}

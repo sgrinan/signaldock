@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -130,7 +131,7 @@ func TestHandler_HandlePostEndpoint(t *testing.T) {
 			var gotRawURL string
 
 			service := &fakeEndpointService{
-				addFunc: func(rawURL string) (endpoint.Endpoint, error) {
+				addFunc: func(ctx context.Context, rawURL string) (endpoint.Endpoint, error) {
 					gotRawURL = rawURL
 
 					return added, tt.err
@@ -177,7 +178,7 @@ func TestHandler_HandlePostEndpoint(t *testing.T) {
 		}
 
 		service := &fakeEndpointService{
-			addFunc: func(string) (endpoint.Endpoint, error) {
+			addFunc: func(context.Context, string) (endpoint.Endpoint, error) {
 				return added, endpoint.CheckError{
 					HTTP: httpErr,
 					TLS:  tlsErr,
@@ -209,7 +210,7 @@ func TestHandler_HandlePostEndpoint(t *testing.T) {
 		called := false
 
 		service := &fakeEndpointService{
-			addFunc: func(string) (endpoint.Endpoint, error) {
+			addFunc: func(context.Context, string) (endpoint.Endpoint, error) {
 				called = true
 
 				return endpoint.Endpoint{}, nil

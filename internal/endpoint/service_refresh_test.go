@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"context"
 	"errors"
 	"net/netip"
 	"net/url"
@@ -14,11 +15,13 @@ import (
 
 func TestService_Refresh(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, checks := newTestService()
 
 		ep := testEndpoint("https://example.com/")
 
-		if err := repository.Insert(ep); err != nil {
+		if err := repository.Insert(ctx, ep); err != nil {
 			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
@@ -41,7 +44,7 @@ func TestService_Refresh(t *testing.T) {
 			return want.TLS, nil
 		}
 
-		got, err := s.Refresh(ep.ID)
+		got, err := s.Refresh(ctx, ep.ID)
 		if err != nil {
 			t.Fatalf("Refresh(%v) error = %v, want nil", ep.ID, err)
 		}
@@ -58,10 +61,12 @@ func TestService_Refresh(t *testing.T) {
 	})
 
 	t.Run("not_found", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, _, _ := newTestService()
 		id := uuid.NewV7()
 
-		_, err := s.Refresh(id)
+		_, err := s.Refresh(ctx, id)
 
 		if !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("Refresh(%v) error = %v, want %v", id, err, ErrEndpointNotFound)
@@ -69,6 +74,8 @@ func TestService_Refresh(t *testing.T) {
 	})
 
 	t.Run("host_check_error_updates_result", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, checks := newTestService()
 
 		ep := testEndpoint("https://example.com/")
@@ -84,7 +91,7 @@ func TestService_Refresh(t *testing.T) {
 			},
 		}
 
-		if err := repository.Insert(ep); err != nil {
+		if err := repository.Insert(ctx, ep); err != nil {
 			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
@@ -92,11 +99,11 @@ func TestService_Refresh(t *testing.T) {
 		// The previous runtime check belongs in CheckStore.
 		checks.Set(ep.ID, ep.LastCheck)
 
-		s.validateHost = func(string) ([]netip.Addr, error) {
+		s.validateHost = func(context.Context, string) ([]netip.Addr, error) {
 			return nil, probe.ErrNoResolvedAddresses
 		}
 
-		got, err := s.Refresh(ep.ID)
+		got, err := s.Refresh(ctx, ep.ID)
 
 		var checkErr CheckError
 		if !errors.As(err, &checkErr) {
@@ -104,12 +111,7 @@ func TestService_Refresh(t *testing.T) {
 		}
 
 		if !errors.Is(err, probe.ErrNoResolvedAddresses) {
-			t.Errorf(
-				"Refresh(%v) error = %v, want %v",
-				ep.ID,
-				err,
-				probe.ErrNoResolvedAddresses,
-			)
+			t.Errorf("Refresh(%v) error = %v, want %v", ep.ID, err, probe.ErrNoResolvedAddresses)
 		}
 
 		if got.HTTP.Responded {
@@ -132,11 +134,13 @@ func TestService_Refresh(t *testing.T) {
 	})
 
 	t.Run("check_error_updates_result", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, checks := newTestService()
 
 		ep := testEndpoint("https://example.com/")
 
-		if err := repository.Insert(ep); err != nil {
+		if err := repository.Insert(ctx, ep); err != nil {
 			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
@@ -150,7 +154,7 @@ func TestService_Refresh(t *testing.T) {
 			return wantHTTP, httpErr
 		}
 
-		got, err := s.Refresh(ep.ID)
+		got, err := s.Refresh(ctx, ep.ID)
 
 		if _, ok := errors.AsType[CheckError](err); !ok {
 			t.Fatalf("Refresh(%v) error = %v, want CheckError", ep.ID, err)

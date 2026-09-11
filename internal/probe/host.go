@@ -21,8 +21,8 @@ type lookupNetIPFunc func(
 
 // ValidateHost resolves host and rejects local, private, and other
 // disallowed destinations for outbound probes.
-func ValidateHost(host string) ([]netip.Addr, error) {
-	return validateHost(host, net.DefaultResolver.LookupNetIP)
+func ValidateHost(ctx context.Context, host string) ([]netip.Addr, error) {
+	return validateHost(ctx, host, net.DefaultResolver.LookupNetIP)
 }
 
 func isUnsafeAddr(addr netip.Addr) bool {
@@ -33,7 +33,7 @@ func isUnsafeAddr(addr netip.Addr) bool {
 		sharedAddressPrefix.Contains(addr)
 }
 
-func validateHost(host string, lookup lookupNetIPFunc) ([]netip.Addr, error) {
+func validateHost(ctx context.Context, host string, lookup lookupNetIPFunc) ([]netip.Addr, error) {
 	addr, err := netip.ParseAddr(host)
 	if err == nil {
 		addr = addr.Unmap()
@@ -45,13 +45,10 @@ func validateHost(host string, lookup lookupNetIPFunc) ([]netip.Addr, error) {
 		return []netip.Addr{addr}, nil
 	}
 
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		resolverTimeout,
-	)
+	resolveCtx, cancel := context.WithTimeout(ctx, resolverTimeout)
 	defer cancel()
 
-	ips, err := lookup(ctx, "ip", host)
+	ips, err := lookup(resolveCtx, "ip", host)
 	if err != nil {
 		return nil, fmt.Errorf("resolve host %q: %w", host, err)
 	}

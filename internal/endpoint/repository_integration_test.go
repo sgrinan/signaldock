@@ -14,14 +14,16 @@ import (
 
 func TestRepository_Insert(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		ctx := t.Context()
+
 		repository := newTestRepository(t)
 		ep := testEndpoint("https://example.com/")
 
-		if err := repository.Insert(ep); err != nil {
+		if err := repository.Insert(ctx, ep); err != nil {
 			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
-		got, err := repository.ByID(ep.ID)
+		got, err := repository.ByID(ctx, ep.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) error = %v, want nil", ep.ID, err)
 		}
@@ -32,21 +34,23 @@ func TestRepository_Insert(t *testing.T) {
 	})
 
 	t.Run("duplicate", func(t *testing.T) {
+		ctx := t.Context()
+
 		repository := newTestRepository(t)
 
 		first := testEndpoint("https://example.com/")
 		second := testEndpoint("https://example.com/")
 
-		if err := repository.Insert(first); err != nil {
+		if err := repository.Insert(ctx, first); err != nil {
 			t.Fatalf("Insert(%+v) error = %v, want nil", first, err)
 		}
 
-		err := repository.Insert(second)
+		err := repository.Insert(ctx, second)
 		if !errors.Is(err, ErrEndpointExists) {
 			t.Errorf("Insert(%+v) error = %v, want %v", second, err, ErrEndpointExists)
 		}
 
-		endpoints, err := repository.List()
+		endpoints, err := repository.List(ctx)
 		if err != nil {
 			t.Fatalf("List() error = %v, want nil", err)
 		}
@@ -56,6 +60,8 @@ func TestRepository_Insert(t *testing.T) {
 		}
 	})
 	t.Run("does_not_persist_last_check", func(t *testing.T) {
+		ctx := t.Context()
+
 		repository := newTestRepository(t)
 
 		ep := testEndpoint("https://example.com/")
@@ -65,11 +71,11 @@ func TestRepository_Insert(t *testing.T) {
 		ep.LastCheck.TLS.Enabled = true
 		ep.LastCheck.TLS.Valid = true
 
-		if err := repository.Insert(ep); err != nil {
+		if err := repository.Insert(ctx, ep); err != nil {
 			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
-		got, err := repository.ByID(ep.ID)
+		got, err := repository.ByID(ctx, ep.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) error = %v, want nil", ep.ID, err)
 		}
@@ -81,6 +87,8 @@ func TestRepository_Insert(t *testing.T) {
 }
 
 func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	const goroutines = 20
@@ -97,7 +105,7 @@ func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
 
 			<-start
 
-			errs <- repository.Insert(testEndpoint("https://example.com/"))
+			errs <- repository.Insert(ctx, testEndpoint("https://example.com/"))
 		}()
 	}
 
@@ -130,7 +138,7 @@ func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
 		t.Errorf("duplicate Insert() calls = %d, want %d", got, want)
 	}
 
-	endpoints, err := repository.List()
+	endpoints, err := repository.List(ctx)
 	if err != nil {
 		t.Fatalf("List() error = %v, want nil", err)
 	}
@@ -141,20 +149,22 @@ func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
 }
 
 func TestRepository_List(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	first := testEndpoint("https://example.com/")
 	second := testEndpoint("https://example.org/")
 
-	if err := repository.Insert(first); err != nil {
+	if err := repository.Insert(ctx, first); err != nil {
 		t.Fatalf("Insert(%+v) error = %v, want nil", first, err)
 	}
 
-	if err := repository.Insert(second); err != nil {
+	if err := repository.Insert(ctx, second); err != nil {
 		t.Fatalf("Insert(%+v) error = %v, want nil", second, err)
 	}
 
-	got, err := repository.List()
+	got, err := repository.List(ctx)
 	if err != nil {
 		t.Fatalf("List() error = %v, want nil", err)
 	}
@@ -169,7 +179,7 @@ func TestRepository_List(t *testing.T) {
 
 	got[0].URL = "https://modified.example/"
 
-	stored, err := repository.ByID(first.ID)
+	stored, err := repository.ByID(ctx, first.ID)
 	if err != nil {
 		t.Fatalf("ByID(%v) error = %v, want nil", first.ID, err)
 	}
@@ -180,15 +190,19 @@ func TestRepository_List(t *testing.T) {
 }
 
 func TestRepository_ByID(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 	ep := testEndpoint("https://example.com/")
 
-	if err := repository.Insert(ep); err != nil {
+	if err := repository.Insert(ctx, ep); err != nil {
 		t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 	}
 
 	t.Run("found", func(t *testing.T) {
-		got, err := repository.ByID(ep.ID)
+		ctx := t.Context()
+
+		got, err := repository.ByID(ctx, ep.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) error = %v, want nil", ep.ID, err)
 		}
@@ -199,9 +213,11 @@ func TestRepository_ByID(t *testing.T) {
 	})
 
 	t.Run("not_found", func(t *testing.T) {
+		ctx := t.Context()
+
 		id := uuid.NewV7()
 
-		if _, err := repository.ByID(id); !errors.Is(err, ErrEndpointNotFound) {
+		if _, err := repository.ByID(ctx, id); !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("ByID(%v) error = %v, want %v", id, err, ErrEndpointNotFound)
 		}
 	})
@@ -209,27 +225,31 @@ func TestRepository_ByID(t *testing.T) {
 
 func TestRepository_RemoveByID(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		ctx := t.Context()
+
 		repository := newTestRepository(t)
 		ep := testEndpoint("https://example.com/")
 
-		if err := repository.Insert(ep); err != nil {
+		if err := repository.Insert(ctx, ep); err != nil {
 			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
-		if err := repository.RemoveByID(ep.ID); err != nil {
+		if err := repository.RemoveByID(ctx, ep.ID); err != nil {
 			t.Fatalf("RemoveByID(%v) error = %v, want nil", ep.ID, err)
 		}
 
-		if _, err := repository.ByID(ep.ID); !errors.Is(err, ErrEndpointNotFound) {
+		if _, err := repository.ByID(ctx, ep.ID); !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("ByID(%v) error = %v, want %v", ep.ID, err, ErrEndpointNotFound)
 		}
 	})
 
 	t.Run("not_found", func(t *testing.T) {
+		ctx := t.Context()
+
 		repository := newTestRepository(t)
 		id := uuid.NewV7()
 
-		if err := repository.RemoveByID(id); !errors.Is(err, ErrEndpointNotFound) {
+		if err := repository.RemoveByID(ctx, id); !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("RemoveByID(%v) error = %v, want %v", id, err, ErrEndpointNotFound)
 		}
 	})

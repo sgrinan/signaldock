@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"context"
 	"net/netip"
 	"net/url"
 	"sync"
@@ -32,7 +33,7 @@ func newTestService() (*Service, *fakeRepository, *fakeCheckStore) {
 		netip.MustParseAddr("203.0.113.10"),
 	}
 
-	s.validateHost = func(string) ([]netip.Addr, error) {
+	s.validateHost = func(context.Context, string) ([]netip.Addr, error) {
 		return ips, nil
 	}
 
@@ -53,7 +54,7 @@ func newTestService() (*Service, *fakeRepository, *fakeCheckStore) {
 	return s, repository, checks
 }
 
-func (r *fakeRepository) Insert(endpoint Endpoint) error {
+func (r *fakeRepository) Insert(ctx context.Context, endpoint Endpoint) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -71,7 +72,7 @@ func (r *fakeRepository) Insert(endpoint Endpoint) error {
 	return nil
 }
 
-func (r *fakeRepository) List() ([]Endpoint, error) {
+func (r *fakeRepository) List(ctx context.Context) ([]Endpoint, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -81,7 +82,7 @@ func (r *fakeRepository) List() ([]Endpoint, error) {
 	return endpoints, nil
 }
 
-func (r *fakeRepository) ByID(id uuid.UUID) (Endpoint, error) {
+func (r *fakeRepository) ByID(ctx context.Context, id uuid.UUID) (Endpoint, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -94,7 +95,7 @@ func (r *fakeRepository) ByID(id uuid.UUID) (Endpoint, error) {
 	return Endpoint{}, ErrEndpointNotFound
 }
 
-func (r *fakeRepository) RemoveByID(id uuid.UUID) error {
+func (r *fakeRepository) RemoveByID(ctx context.Context, id uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

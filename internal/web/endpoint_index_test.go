@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -55,7 +56,7 @@ func TestHandler_HandleGetIndex(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := &fakeEndpointService{
-				listFunc: func() ([]endpoint.Endpoint, error) {
+				listFunc: func(context.Context) ([]endpoint.Endpoint, error) {
 					return []endpoint.Endpoint{
 						{ID: uuid.NewV7()},
 						{ID: uuid.NewV7()},

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -91,7 +92,7 @@ func TestHandler_HandleGetEndpoint(t *testing.T) {
 			called := false
 
 			service := &fakeEndpointService{
-				byIDFunc: func(gotID uuid.UUID) (endpoint.Endpoint, error) {
+				byIDFunc: func(ctx context.Context, gotID uuid.UUID) (endpoint.Endpoint, error) {
 					called = true
 
 					if gotID != id {

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -25,7 +26,7 @@ func TestHandler_HandleGetUsers(t *testing.T) {
 		}
 
 		h.users = &fakeUserRepository{
-			listFunc: func() ([]user.User, error) {
+			listFunc: func(context.Context) ([]user.User, error) {
 				return []user.User{
 					current,
 					{
@@ -59,7 +60,7 @@ func TestHandler_HandleGetUsers(t *testing.T) {
 		repositoryErr := errors.New("repository failed")
 
 		h.users = &fakeUserRepository{
-			listFunc: func() ([]user.User, error) {
+			listFunc: func(context.Context) ([]user.User, error) {
 				return nil, repositoryErr
 			},
 		}
@@ -86,7 +87,7 @@ func TestHandler_HandlePostUser(t *testing.T) {
 	var inserted user.User
 
 	h.users = &fakeUserRepository{
-		insertFunc: func(account user.User) error {
+		insertFunc: func(ctx context.Context, account user.User) error {
 			inserted = account
 			return nil
 		},
@@ -175,7 +176,7 @@ func TestHandler_HandlePostUserInvalidInput(t *testing.T) {
 			h := newTestHandler(&fakeEndpointService{})
 
 			h.users = &fakeUserRepository{
-				listFunc: func() ([]user.User, error) {
+				listFunc: func(context.Context) ([]user.User, error) {
 					return nil, nil
 				},
 			}
@@ -215,10 +216,10 @@ func TestHandler_HandlePostUserDuplicate(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
 
 	h.users = &fakeUserRepository{
-		insertFunc: func(user.User) error {
+		insertFunc: func(context.Context, user.User) error {
 			return user.ErrUserExists
 		},
-		listFunc: func() ([]user.User, error) {
+		listFunc: func(context.Context) ([]user.User, error) {
 			return nil, nil
 		},
 	}
@@ -264,7 +265,7 @@ func TestHandler_HandleDeleteUserSelf(t *testing.T) {
 	called := false
 
 	h.users = &fakeUserRepository{
-		removeByIDFunc: func(uuid.UUID) error {
+		removeByIDFunc: func(context.Context, uuid.UUID) error {
 			called = true
 			return nil
 		},
@@ -310,7 +311,7 @@ func TestHandler_HandleDeleteUser(t *testing.T) {
 		var removedID uuid.UUID
 
 		h.users = &fakeUserRepository{
-			removeByIDFunc: func(id uuid.UUID) error {
+			removeByIDFunc: func(ctx context.Context, id uuid.UUID) error {
 				removedID = id
 				return nil
 			},
@@ -347,7 +348,7 @@ func TestHandler_HandleDeleteUser(t *testing.T) {
 		targetID := uuid.NewV7()
 
 		h.users = &fakeUserRepository{
-			removeByIDFunc: func(uuid.UUID) error {
+			removeByIDFunc: func(context.Context, uuid.UUID) error {
 				return user.ErrUserNotFound
 			},
 		}
@@ -383,7 +384,7 @@ func TestHandler_HandleUpdateUser(t *testing.T) {
 		)
 
 		h.users = &fakeUserRepository{
-			setRoleFunc: func(id uuid.UUID, role user.Role) error {
+			setRoleFunc: func(ctx context.Context, id uuid.UUID, role user.Role) error {
 				if got, want := id, targetID; got != want {
 					t.Errorf("SetRole() id = %v, want %v", got, want)
 				}
@@ -392,7 +393,7 @@ func TestHandler_HandleUpdateUser(t *testing.T) {
 				return nil
 			},
 
-			setDisabledFunc: func(id uuid.UUID, disabled bool) error {
+			setDisabledFunc: func(ctx context.Context, id uuid.UUID, disabled bool) error {
 				if got, want := id, targetID; got != want {
 					t.Errorf("SetDisabled() id = %v, want %v", got, want)
 				}
@@ -443,12 +444,12 @@ func TestHandler_HandleUpdateUser(t *testing.T) {
 		called := false
 
 		h.users = &fakeUserRepository{
-			setRoleFunc: func(uuid.UUID, user.Role) error {
+			setRoleFunc: func(context.Context, uuid.UUID, user.Role) error {
 				called = true
 				return nil
 			},
 
-			setDisabledFunc: func(uuid.UUID, bool) error {
+			setDisabledFunc: func(context.Context, uuid.UUID, bool) error {
 				called = true
 				return nil
 			},
@@ -535,7 +536,7 @@ func TestHandler_HandleUpdateUser(t *testing.T) {
 		targetID := uuid.NewV7()
 
 		h.users = &fakeUserRepository{
-			setRoleFunc: func(uuid.UUID, user.Role) error {
+			setRoleFunc: func(context.Context, uuid.UUID, user.Role) error {
 				return user.ErrUserNotFound
 			},
 		}

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -49,7 +50,7 @@ func TestHandler_HandleDeleteEndpoint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := &fakeEndpointService{
-				removeByIDFunc: func(uuid.UUID) error {
+				removeByIDFunc: func(context.Context, uuid.UUID) error {
 					return tt.removeErr
 				},
 			}
@@ -77,7 +78,7 @@ func TestHandler_HandleDeleteEndpoint(t *testing.T) {
 		called := false
 
 		service := &fakeEndpointService{
-			removeByIDFunc: func(uuid.UUID) error {
+			removeByIDFunc: func(context.Context, uuid.UUID) error {
 				called = true
 
 				return nil
@@ -152,7 +153,7 @@ func TestHandler_HandleRefreshEndpoint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := &fakeEndpointService{
-				refreshFunc: func(uuid.UUID) (endpoint.CheckResult, error) {
+				refreshFunc: func(context.Context, uuid.UUID) (endpoint.CheckResult, error) {
 					return endpoint.CheckResult{}, tt.refreshErr
 				},
 			}
@@ -180,7 +181,7 @@ func TestHandler_HandleRefreshEndpoint(t *testing.T) {
 		called := false
 
 		service := &fakeEndpointService{
-			refreshFunc: func(uuid.UUID) (endpoint.CheckResult, error) {
+			refreshFunc: func(context.Context, uuid.UUID) (endpoint.CheckResult, error) {
 				called = true
 
 				return endpoint.CheckResult{}, nil

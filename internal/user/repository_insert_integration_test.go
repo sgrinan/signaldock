@@ -10,6 +10,8 @@ import (
 )
 
 func TestRepository_Insert(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	want := User{
@@ -20,11 +22,11 @@ func TestRepository_Insert(t *testing.T) {
 		Disabled:     false,
 	}
 
-	if err := repository.Insert(want); err != nil {
+	if err := repository.Insert(ctx, want); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	got, err := repository.ByID(want.ID)
+	got, err := repository.ByID(ctx, want.ID)
 	if err != nil {
 		t.Fatalf("ByID() error = %v, want nil", err)
 	}
@@ -55,6 +57,8 @@ func TestRepository_Insert(t *testing.T) {
 }
 
 func TestRepository_InsertDuplicate(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	first := User{
@@ -71,11 +75,11 @@ func TestRepository_InsertDuplicate(t *testing.T) {
 		Role:         RoleViewer,
 	}
 
-	if err := repository.Insert(first); err != nil {
+	if err := repository.Insert(ctx, first); err != nil {
 		t.Fatalf("first Insert() error = %v, want nil", err)
 	}
 
-	err := repository.Insert(second)
+	err := repository.Insert(ctx, second)
 
 	if !errors.Is(err, ErrUserExists) {
 		t.Fatalf("second Insert() error = %v, want ErrUserExists", err)
@@ -83,6 +87,8 @@ func TestRepository_InsertDuplicate(t *testing.T) {
 }
 
 func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	const goroutines = 20
@@ -106,7 +112,7 @@ func TestRepository_InsertConcurrentDuplicate(t *testing.T) {
 				Role:         RoleAdmin,
 			}
 
-			err := repository.Insert(user)
+			err := repository.Insert(ctx, user)
 
 			switch {
 			case err == nil:

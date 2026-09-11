@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -17,16 +18,16 @@ type Service struct {
 	repository endpointRepository
 	checks     checkStore
 
-	validateHost func(string) ([]netip.Addr, error)
+	validateHost func(context.Context, string) ([]netip.Addr, error)
 	probeHTTP    func(*url.URL, []netip.Addr) (probe.HTTPResult, error)
 	probeTLS     func(*url.URL, []netip.Addr) (probe.TLSResult, error)
 }
 
 type endpointRepository interface {
-	Insert(endpoint Endpoint) error
-	List() ([]Endpoint, error)
-	ByID(id uuid.UUID) (Endpoint, error)
-	RemoveByID(id uuid.UUID) error
+	Insert(context.Context, Endpoint) error
+	List(context.Context) ([]Endpoint, error)
+	ByID(context.Context, uuid.UUID) (Endpoint, error)
+	RemoveByID(context.Context, uuid.UUID) error
 }
 
 type checkStore interface {
@@ -48,7 +49,7 @@ func NewService(repository endpointRepository, checks checkStore) *Service {
 
 // Add validates and checks rawURL, then stores the resulting endpoint.
 // Probe failures do not prevent the endpoint or its observed results from being stored.
-func (s *Service) Add(rawURL string) (Endpoint, error) {
+func (s *Service) Add(ctx context.Context, rawURL string) (Endpoint, error) {
 	parsedURL, err := ParseURL(rawURL)
 	if err != nil {
 		return Endpoint{}, err
@@ -59,7 +60,7 @@ func (s *Service) Add(rawURL string) (Endpoint, error) {
 		URL: parsedURL.String(),
 	}
 
-	ips, err := s.validateEndpointHost(parsedURL)
+	ips, err := s.validateEndpointHost(ctx, parsedURL)
 	if err != nil {
 		if errors.Is(err, ErrUnsafeHost) {
 			return Endpoint{}, err
@@ -67,7 +68,7 @@ func (s *Service) Add(rawURL string) (Endpoint, error) {
 
 		lastCheck := hostFailureResult(parsedURL)
 
-		if err := s.repository.Insert(ep); err != nil {
+		if err := s.repository.Insert(ctx, ep); err != nil {
 			return Endpoint{}, err
 		}
 
@@ -82,7 +83,7 @@ func (s *Service) Add(rawURL string) (Endpoint, error) {
 	// Reserve the normalized endpoint before performing slow network I/O.
 	// Repository.Insert performs the duplicate check atomically, so concurrent
 	// Add calls for the same URL cannot all execute the probes.
-	if err := s.repository.Insert(ep); err != nil {
+	if err := s.repository.Insert(ctx, ep); err != nil {
 		return Endpoint{}, err
 	}
 
@@ -96,8 +97,8 @@ func (s *Service) Add(rawURL string) (Endpoint, error) {
 
 // Refresh checks an existing endpoint and stores its latest observed result.
 // Probe failures are returned after the result has been stored.
-func (s *Service) Refresh(id uuid.UUID) (CheckResult, error) {
-	ep, err := s.repository.ByID(id)
+func (s *Service) Refresh(ctx context.Context, id uuid.UUID) (CheckResult, error) {
+	ep, err := s.repository.ByID(ctx, id)
 	if err != nil {
 		return CheckResult{}, err
 	}
@@ -107,7 +108,7 @@ func (s *Service) Refresh(id uuid.UUID) (CheckResult, error) {
 		return CheckResult{}, err
 	}
 
-	ips, err := s.validateEndpointHost(parsedURL)
+	ips, err := s.validateEndpointHost(ctx, parsedURL)
 	if err != nil {
 		lastCheck := hostFailureResult(parsedURL)
 
@@ -126,8 +127,8 @@ func (s *Service) Refresh(id uuid.UUID) (CheckResult, error) {
 }
 
 // List returns a snapshot of the stored endpoints with their latest checks.
-func (s *Service) List() ([]Endpoint, error) {
-	endpoints, err := s.repository.List()
+func (s *Service) List(ctx context.Context) ([]Endpoint, error) {
+	endpoints, err := s.repository.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -140,8 +141,8 @@ func (s *Service) List() ([]Endpoint, error) {
 }
 
 // ByID returns the endpoint with the given ID and its latest check.
-func (s *Service) ByID(id uuid.UUID) (Endpoint, error) {
-	ep, err := s.repository.ByID(id)
+func (s *Service) ByID(ctx context.Context, id uuid.UUID) (Endpoint, error) {
+	ep, err := s.repository.ByID(ctx, id)
 	if err != nil {
 		return Endpoint{}, err
 	}
@@ -152,8 +153,8 @@ func (s *Service) ByID(id uuid.UUID) (Endpoint, error) {
 }
 
 // RemoveByID removes the endpoint configuration and its latest check result.
-func (s *Service) RemoveByID(id uuid.UUID) error {
-	if err := s.repository.RemoveByID(id); err != nil {
+func (s *Service) RemoveByID(ctx context.Context, id uuid.UUID) error {
+	if err := s.repository.RemoveByID(ctx, id); err != nil {
 		return err
 	}
 
@@ -164,8 +165,8 @@ func (s *Service) RemoveByID(id uuid.UUID) error {
 
 // validateEndpointHost validates the endpoint destination and translates
 // probe-level host safety errors into endpoint-domain errors.
-func (s *Service) validateEndpointHost(parsedURL *url.URL) ([]netip.Addr, error) {
-	ips, err := s.validateHost(parsedURL.Hostname())
+func (s *Service) validateEndpointHost(ctx context.Context, parsedURL *url.URL) ([]netip.Addr, error) {
+	ips, err := s.validateHost(ctx, parsedURL.Hostname())
 	if err == nil {
 		return ips, nil
 	}

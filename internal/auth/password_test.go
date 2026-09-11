@@ -82,6 +82,10 @@ func TestVerifyPasswordInvalidHash(t *testing.T) {
 			name: "unsupported_version",
 			hash: "$argon2id$v=999$m=19456,t=2,p=1$c2FsdA$aGFzaA",
 		},
+		{
+			name: "unsupported_parameters",
+			hash: "$argon2id$v=19$m=4294967295,t=2,p=1$c2FsdA$aGFzaA",
+		},
 	}
 
 	for _, tt := range tests {

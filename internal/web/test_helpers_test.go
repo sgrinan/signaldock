@@ -19,146 +19,146 @@ import (
 )
 
 type fakeEndpointService struct {
-	addFunc        func(string) (endpoint.Endpoint, error)
-	listFunc       func() ([]endpoint.Endpoint, error)
-	byIDFunc       func(uuid.UUID) (endpoint.Endpoint, error)
-	removeByIDFunc func(uuid.UUID) error
-	refreshFunc    func(uuid.UUID) (endpoint.CheckResult, error)
+	addFunc        func(context.Context, string) (endpoint.Endpoint, error)
+	listFunc       func(context.Context) ([]endpoint.Endpoint, error)
+	byIDFunc       func(context.Context, uuid.UUID) (endpoint.Endpoint, error)
+	removeByIDFunc func(context.Context, uuid.UUID) error
+	refreshFunc    func(context.Context, uuid.UUID) (endpoint.CheckResult, error)
 }
 
 var _ endpointService = (*fakeEndpointService)(nil)
 
-func (f *fakeEndpointService) Add(rawURL string) (endpoint.Endpoint, error) {
+func (f *fakeEndpointService) Add(ctx context.Context, rawURL string) (endpoint.Endpoint, error) {
 	if f.addFunc != nil {
-		return f.addFunc(rawURL)
+		return f.addFunc(ctx, rawURL)
 	}
 
 	return endpoint.Endpoint{}, nil
 }
 
-func (f *fakeEndpointService) List() ([]endpoint.Endpoint, error) {
+func (f *fakeEndpointService) List(ctx context.Context) ([]endpoint.Endpoint, error) {
 	if f.listFunc != nil {
-		return f.listFunc()
+		return f.listFunc(ctx)
 	}
 
 	return nil, nil
 }
 
-func (f *fakeEndpointService) ByID(id uuid.UUID) (endpoint.Endpoint, error) {
+func (f *fakeEndpointService) ByID(ctx context.Context, id uuid.UUID) (endpoint.Endpoint, error) {
 	if f.byIDFunc != nil {
-		return f.byIDFunc(id)
+		return f.byIDFunc(ctx, id)
 	}
 
 	return endpoint.Endpoint{}, endpoint.ErrEndpointNotFound
 }
 
-func (f *fakeEndpointService) RemoveByID(id uuid.UUID) error {
+func (f *fakeEndpointService) RemoveByID(ctx context.Context, id uuid.UUID) error {
 	if f.removeByIDFunc != nil {
-		return f.removeByIDFunc(id)
+		return f.removeByIDFunc(ctx, id)
 	}
 
 	return nil
 }
 
-func (f *fakeEndpointService) Refresh(id uuid.UUID) (endpoint.CheckResult, error) {
+func (f *fakeEndpointService) Refresh(ctx context.Context, id uuid.UUID) (endpoint.CheckResult, error) {
 	if f.refreshFunc != nil {
-		return f.refreshFunc(id)
+		return f.refreshFunc(ctx, id)
 	}
 
 	return endpoint.CheckResult{}, nil
 }
 
 type fakeUserRepository struct {
-	insertFunc      func(user.User) error
-	listFunc        func() ([]user.User, error)
-	byUsernameFunc  func(string) (user.User, error)
-	byIDFunc        func(uuid.UUID) (user.User, error)
-	setDisabledFunc func(uuid.UUID, bool) error
-	setRoleFunc     func(uuid.UUID, user.Role) error
-	removeByIDFunc  func(uuid.UUID) error
+	insertFunc      func(context.Context, user.User) error
+	listFunc        func(context.Context) ([]user.User, error)
+	byUsernameFunc  func(context.Context, string) (user.User, error)
+	byIDFunc        func(context.Context, uuid.UUID) (user.User, error)
+	setDisabledFunc func(context.Context, uuid.UUID, bool) error
+	setRoleFunc     func(context.Context, uuid.UUID, user.Role) error
+	removeByIDFunc  func(context.Context, uuid.UUID) error
 }
 
-func (f *fakeUserRepository) Insert(account user.User) error {
+func (f *fakeUserRepository) Insert(ctx context.Context, account user.User) error {
 	if f.insertFunc != nil {
-		return f.insertFunc(account)
+		return f.insertFunc(ctx, account)
 	}
 
 	return nil
 }
 
-func (f *fakeUserRepository) List() ([]user.User, error) {
+func (f *fakeUserRepository) List(ctx context.Context) ([]user.User, error) {
 	if f.listFunc != nil {
-		return f.listFunc()
+		return f.listFunc(ctx)
 	}
 
 	return nil, nil
 }
 
-func (f *fakeUserRepository) ByUsername(username string) (user.User, error) {
+func (f *fakeUserRepository) ByUsername(ctx context.Context, username string) (user.User, error) {
 	if f.byUsernameFunc != nil {
-		return f.byUsernameFunc(username)
+		return f.byUsernameFunc(ctx, username)
 	}
 
 	return user.User{}, user.ErrUserNotFound
 }
 
-func (f *fakeUserRepository) ByID(id uuid.UUID) (user.User, error) {
+func (f *fakeUserRepository) ByID(ctx context.Context, id uuid.UUID) (user.User, error) {
 	if f.byIDFunc != nil {
-		return f.byIDFunc(id)
+		return f.byIDFunc(ctx, id)
 	}
 
 	return user.User{}, user.ErrUserNotFound
 }
 
-func (f *fakeUserRepository) SetDisabled(id uuid.UUID, disabled bool) error {
+func (f *fakeUserRepository) SetDisabled(ctx context.Context, id uuid.UUID, disabled bool) error {
 	if f.setDisabledFunc != nil {
-		return f.setDisabledFunc(id, disabled)
+		return f.setDisabledFunc(ctx, id, disabled)
 	}
 
 	return nil
 }
 
-func (f *fakeUserRepository) SetRole(id uuid.UUID, role user.Role) error {
+func (f *fakeUserRepository) SetRole(ctx context.Context, id uuid.UUID, role user.Role) error {
 	if f.setRoleFunc != nil {
-		return f.setRoleFunc(id, role)
+		return f.setRoleFunc(ctx, id, role)
 	}
 
 	return nil
 }
 
-func (f *fakeUserRepository) RemoveByID(id uuid.UUID) error {
+func (f *fakeUserRepository) RemoveByID(ctx context.Context, id uuid.UUID) error {
 	if f.removeByIDFunc != nil {
-		return f.removeByIDFunc(id)
+		return f.removeByIDFunc(ctx, id)
 	}
 
 	return nil
 }
 
 type fakeSessionService struct {
-	createFunc   func(uuid.UUID) (string, error)
-	validateFunc func(string) (session.Session, error)
-	deleteFunc   func(string) error
+	createFunc   func(context.Context, uuid.UUID) (string, error)
+	validateFunc func(context.Context, string) (session.Session, error)
+	deleteFunc   func(context.Context, string) error
 }
 
-func (f *fakeSessionService) Create(userID uuid.UUID) (string, error) {
+func (f *fakeSessionService) Create(ctx context.Context, userID uuid.UUID) (string, error) {
 	if f.createFunc != nil {
-		return f.createFunc(userID)
+		return f.createFunc(ctx, userID)
 	}
 
 	return "test-session-token", nil
 }
 
-func (f *fakeSessionService) Validate(token string) (session.Session, error) {
+func (f *fakeSessionService) Validate(ctx context.Context, token string) (session.Session, error) {
 	if f.validateFunc != nil {
-		return f.validateFunc(token)
+		return f.validateFunc(ctx, token)
 	}
 
 	return session.Session{}, nil
 }
 
-func (f *fakeSessionService) Delete(token string) error {
+func (f *fakeSessionService) Delete(ctx context.Context, token string) error {
 	if f.deleteFunc != nil {
-		return f.deleteFunc(token)
+		return f.deleteFunc(ctx, token)
 	}
 
 	return nil

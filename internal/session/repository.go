@@ -24,13 +24,13 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
-func (r *Repository) Insert(session Session) error {
+func (r *Repository) Insert(ctx context.Context, session Session) error {
 	const query = `
 		INSERT INTO sessions (token_hash, user_id, expires_at)
 		VALUES ($1, $2, $3)
 	`
 
-	_, err := r.pool.Exec(context.Background(), query, session.TokenHash, session.UserID, session.ExpiresAt)
+	_, err := r.pool.Exec(ctx, query, session.TokenHash, session.UserID, session.ExpiresAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 
@@ -44,7 +44,7 @@ func (r *Repository) Insert(session Session) error {
 	return nil
 }
 
-func (r *Repository) ByTokenHash(tokenHash string) (Session, error) {
+func (r *Repository) ByTokenHash(ctx context.Context, tokenHash string) (Session, error) {
 	const query = `
 		SELECT token_hash, user_id::text, expires_at, created_at
 		FROM sessions
@@ -56,7 +56,7 @@ func (r *Repository) ByTokenHash(tokenHash string) (Session, error) {
 		rawID   string
 	)
 
-	err := r.pool.QueryRow(context.Background(), query, tokenHash).Scan(&session.TokenHash, &rawID, &session.ExpiresAt, &session.CreatedAt)
+	err := r.pool.QueryRow(ctx, query, tokenHash).Scan(&session.TokenHash, &rawID, &session.ExpiresAt, &session.CreatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrSessionNotFound
@@ -74,13 +74,13 @@ func (r *Repository) ByTokenHash(tokenHash string) (Session, error) {
 	return session, nil
 }
 
-func (r *Repository) Delete(tokenHash string) error {
+func (r *Repository) Delete(ctx context.Context, tokenHash string) error {
 	const query = `
 		DELETE FROM sessions
 		WHERE token_hash = $1
 	`
 
-	result, err := r.pool.Exec(context.Background(), query, tokenHash)
+	result, err := r.pool.Exec(ctx, query, tokenHash)
 	if err != nil {
 		return fmt.Errorf("delete session: %w", err)
 	}
@@ -92,13 +92,13 @@ func (r *Repository) Delete(tokenHash string) error {
 	return nil
 }
 
-func (r *Repository) DeleteExpired() error {
+func (r *Repository) DeleteExpired(ctx context.Context) error {
 	const query = `
 		DELETE FROM sessions
 		WHERE expires_at <= NOW()
 	`
 
-	_, err := r.pool.Exec(context.Background(), query)
+	_, err := r.pool.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("delete expired sessions: %w", err)
 	}

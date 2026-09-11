@@ -10,8 +10,8 @@ type prometheusTargetGroup struct {
 	Labels  map[string]string `json:"labels"`
 }
 
-func (h *handler) handlePrometheusTargets(writer http.ResponseWriter, _ *http.Request) {
-	endpoints, err := h.endpoints.List()
+func (h *handler) handlePrometheusTargets(writer http.ResponseWriter, r *http.Request) {
+	endpoints, err := h.endpoints.List(r.Context())
 	if err != nil {
 		h.logger.Error("failed to list endpoints", "error", err)
 

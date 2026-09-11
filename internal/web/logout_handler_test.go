@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,7 +15,7 @@ func TestHandler_HandlePostLogout(t *testing.T) {
 	deleted := false
 
 	h.sessions = &fakeSessionService{
-		deleteFunc: func(token string) error {
+		deleteFunc: func(ctx context.Context, token string) error {
 			if got, want := token, "session-token"; got != want {
 				t.Errorf("Delete(%q), want %q", got, want)
 			}

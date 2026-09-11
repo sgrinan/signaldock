@@ -19,7 +19,7 @@ type usersPageData struct {
 }
 
 func (h *handler) handleGetUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := h.users.List()
+	users, err := h.users.List(r.Context())
 	if err != nil {
 		h.logger.Error("failed to list users", "error", err)
 
@@ -77,7 +77,7 @@ func (h *handler) handlePostUser(w http.ResponseWriter, r *http.Request) {
 		Role:         role,
 	}
 
-	if err := h.users.Insert(account); err != nil {
+	if err := h.users.Insert(r.Context(), account); err != nil {
 		if errors.Is(err, user.ErrUserExists) {
 			h.renderUsersError(w, r, "Username already exists")
 			return
@@ -93,7 +93,7 @@ func (h *handler) handlePostUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) renderUsersError(w http.ResponseWriter, r *http.Request, message string) {
-	users, err := h.users.List()
+	users, err := h.users.List(r.Context())
 	if err != nil {
 		h.logger.Error("failed to list users", "error", err)
 
@@ -150,7 +150,7 @@ func (h *handler) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.users.RemoveByID(id); err != nil {
+	if err := h.users.RemoveByID(r.Context(), id); err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
@@ -196,7 +196,7 @@ func (h *handler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	disabled := r.FormValue("disabled") == "true"
 
-	if err := h.users.SetRole(id, role); err != nil {
+	if err := h.users.SetRole(r.Context(), id, role); err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
@@ -207,7 +207,7 @@ func (h *handler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.users.SetDisabled(id, disabled); err != nil {
+	if err := h.users.SetDisabled(r.Context(), id, disabled); err != nil {
 		h.logger.Error("failed to update user status", "user_id", id, "error", err)
 		http.Error(w, "failed to update user", http.StatusInternalServerError)
 		return

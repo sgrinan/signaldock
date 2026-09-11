@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -11,9 +12,9 @@ import (
 const sessionDuration = 24 * time.Hour
 
 type sessionRepository interface {
-	Insert(Session) error
-	ByTokenHash(string) (Session, error)
-	Delete(string) error
+	Insert(context.Context, Session) error
+	ByTokenHash(context.Context, string) (Session, error)
+	Delete(context.Context, string) error
 }
 
 // Service manages session creation, validation, and deletion.
@@ -29,7 +30,7 @@ func NewService(repository sessionRepository) *Service {
 }
 
 // Create creates a session for userID and returns the raw session token.
-func (s *Service) Create(userID uuid.UUID) (string, error) {
+func (s *Service) Create(ctx context.Context, userID uuid.UUID) (string, error) {
 	token := GenerateToken()
 	hash := HashToken(token)
 
@@ -39,7 +40,7 @@ func (s *Service) Create(userID uuid.UUID) (string, error) {
 		ExpiresAt: time.Now().Add(sessionDuration),
 	}
 
-	if err := s.repository.Insert(session); err != nil {
+	if err := s.repository.Insert(ctx, session); err != nil {
 		return "", fmt.Errorf("create session: %w", err)
 	}
 
@@ -48,16 +49,16 @@ func (s *Service) Create(userID uuid.UUID) (string, error) {
 
 // Validate returns the session associated with token.
 // Expired sessions are deleted and reported as ErrSessionExpired.
-func (s *Service) Validate(token string) (Session, error) {
+func (s *Service) Validate(ctx context.Context, token string) (Session, error) {
 	hash := HashToken(token)
 
-	session, err := s.repository.ByTokenHash(hash)
+	session, err := s.repository.ByTokenHash(ctx, hash)
 	if err != nil {
 		return Session{}, fmt.Errorf("validate session: %w", err)
 	}
 
 	if !time.Now().Before(session.ExpiresAt) {
-		if err := s.repository.Delete(hash); err != nil {
+		if err := s.repository.Delete(ctx, hash); err != nil {
 			return Session{}, fmt.Errorf("delete expired session: %w", err)
 		}
 
@@ -69,10 +70,10 @@ func (s *Service) Validate(token string) (Session, error) {
 
 // Delete removes the session associated with token.
 // Deleting an already missing session succeeds.
-func (s *Service) Delete(token string) error {
+func (s *Service) Delete(ctx context.Context, token string) error {
 	hash := HashToken(token)
 
-	if err := s.repository.Delete(hash); err != nil {
+	if err := s.repository.Delete(ctx, hash); err != nil {
 		if errors.Is(err, ErrSessionNotFound) {
 			return nil
 		}

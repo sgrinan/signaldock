@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"html/template"
@@ -17,11 +18,11 @@ import (
 var assets embed.FS
 
 type endpointService interface {
-	Add(string) (endpoint.Endpoint, error)
-	List() ([]endpoint.Endpoint, error)
-	ByID(uuid.UUID) (endpoint.Endpoint, error)
-	RemoveByID(uuid.UUID) error
-	Refresh(uuid.UUID) (endpoint.CheckResult, error)
+	Add(context.Context, string) (endpoint.Endpoint, error)
+	List(context.Context) ([]endpoint.Endpoint, error)
+	ByID(context.Context, uuid.UUID) (endpoint.Endpoint, error)
+	RemoveByID(context.Context, uuid.UUID) error
+	Refresh(context.Context, uuid.UUID) (endpoint.CheckResult, error)
 }
 
 type handler struct {

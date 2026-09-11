@@ -11,16 +11,18 @@ import (
 )
 
 func TestService_List(t *testing.T) {
+	ctx := t.Context()
+
 	s, repository, checks := newTestService()
 
 	first := testEndpoint("https://example.com/")
 	second := testEndpoint("https://example.org/")
 
-	if err := repository.Insert(first); err != nil {
+	if err := repository.Insert(ctx, first); err != nil {
 		t.Fatalf("Insert(%+v) error = %v, want nil", first, err)
 	}
 
-	if err := repository.Insert(second); err != nil {
+	if err := repository.Insert(ctx, second); err != nil {
 		t.Fatalf("Insert(%+v) error = %v, want nil", second, err)
 	}
 
@@ -57,7 +59,7 @@ func TestService_List(t *testing.T) {
 		second,
 	}
 
-	got, err := s.List()
+	got, err := s.List(ctx)
 	if err != nil {
 		t.Fatalf("List() error = %v, want nil", err)
 	}
@@ -75,11 +77,13 @@ func TestService_List(t *testing.T) {
 
 func TestService_ByID(t *testing.T) {
 	t.Run("found", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, checks := newTestService()
 
 		ep := testEndpoint("https://example.com/")
 
-		if err := repository.Insert(ep); err != nil {
+		if err := repository.Insert(ctx, ep); err != nil {
 			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
@@ -98,7 +102,7 @@ func TestService_ByID(t *testing.T) {
 
 		ep.LastCheck = check
 
-		got, err := s.ByID(ep.ID)
+		got, err := s.ByID(ctx, ep.ID)
 		if err != nil {
 			t.Fatalf("ByID(%v) error = %v, want nil", ep.ID, err)
 		}
@@ -109,11 +113,13 @@ func TestService_ByID(t *testing.T) {
 	})
 
 	t.Run("not_found", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, _, _ := newTestService()
 
 		id := uuid.NewV7()
 
-		got, err := s.ByID(id)
+		got, err := s.ByID(ctx, id)
 
 		if !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("ByID(%v) error = %v, want %v", id, err, ErrEndpointNotFound)
@@ -127,11 +133,13 @@ func TestService_ByID(t *testing.T) {
 
 func TestService_RemoveByID(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, repository, checks := newTestService()
 
 		ep := testEndpoint("https://example.com/")
 
-		if err := repository.Insert(ep); err != nil {
+		if err := repository.Insert(ctx, ep); err != nil {
 			t.Fatalf("Insert(%+v) error = %v, want nil", ep, err)
 		}
 
@@ -144,11 +152,11 @@ func TestService_RemoveByID(t *testing.T) {
 
 		checks.Set(ep.ID, check)
 
-		if err := s.RemoveByID(ep.ID); err != nil {
+		if err := s.RemoveByID(ctx, ep.ID); err != nil {
 			t.Fatalf("RemoveByID(%v) error = %v, want nil", ep.ID, err)
 		}
 
-		_, err := repository.ByID(ep.ID)
+		_, err := repository.ByID(ctx, ep.ID)
 		if !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("repository.ByID(%v) error = %v, want %v", ep.ID, err, ErrEndpointNotFound)
 		}
@@ -159,6 +167,8 @@ func TestService_RemoveByID(t *testing.T) {
 	})
 
 	t.Run("not_found_preserves_check", func(t *testing.T) {
+		ctx := t.Context()
+
 		s, _, checks := newTestService()
 
 		id := uuid.NewV7()
@@ -172,7 +182,7 @@ func TestService_RemoveByID(t *testing.T) {
 
 		checks.Set(id, want)
 
-		err := s.RemoveByID(id)
+		err := s.RemoveByID(ctx, id)
 
 		if !errors.Is(err, ErrEndpointNotFound) {
 			t.Errorf("RemoveByID(%v) error = %v, want %v", id, err, ErrEndpointNotFound)

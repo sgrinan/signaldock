@@ -25,13 +25,13 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 }
 
 // Insert persists an endpoint's identity and URL.
-func (r *Repository) Insert(endpoint Endpoint) error {
+func (r *Repository) Insert(ctx context.Context, endpoint Endpoint) error {
 	const query = `
 		INSERT INTO endpoints (id, url)
 		VALUES ($1, $2)
 	`
 
-	_, err := r.pool.Exec(context.Background(), query, endpoint.ID, endpoint.URL)
+	_, err := r.pool.Exec(ctx, query, endpoint.ID, endpoint.URL)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -45,14 +45,14 @@ func (r *Repository) Insert(endpoint Endpoint) error {
 }
 
 // List returns all persisted endpoint configurations.
-func (r *Repository) List() ([]Endpoint, error) {
+func (r *Repository) List(ctx context.Context) ([]Endpoint, error) {
 	const query = `
 		SELECT id::text, url
 		FROM endpoints
 		ORDER BY created_at, id
 	`
 
-	rows, err := r.pool.Query(context.Background(), query)
+	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("list endpoints: %w", err)
 	}
@@ -86,7 +86,7 @@ func (r *Repository) List() ([]Endpoint, error) {
 }
 
 // ByID returns the persisted endpoint configuration with the given ID.
-func (r *Repository) ByID(id uuid.UUID) (Endpoint, error) {
+func (r *Repository) ByID(ctx context.Context, id uuid.UUID) (Endpoint, error) {
 	const query = `
 		SELECT id::text, url
 		FROM endpoints
@@ -98,7 +98,7 @@ func (r *Repository) ByID(id uuid.UUID) (Endpoint, error) {
 		rawID    string
 	)
 
-	err := r.pool.QueryRow(context.Background(), query, id).Scan(&rawID, &endpoint.URL)
+	err := r.pool.QueryRow(ctx, query, id).Scan(&rawID, &endpoint.URL)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Endpoint{}, ErrEndpointNotFound
@@ -117,13 +117,13 @@ func (r *Repository) ByID(id uuid.UUID) (Endpoint, error) {
 }
 
 // RemoveByID removes the persisted endpoint with the given ID.
-func (r *Repository) RemoveByID(id uuid.UUID) error {
+func (r *Repository) RemoveByID(ctx context.Context, id uuid.UUID) error {
 	const query = `
 		DELETE FROM endpoints
 		WHERE id = $1
 	`
 
-	result, err := r.pool.Exec(context.Background(), query, id)
+	result, err := r.pool.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("remove endpoint: %w", err)
 	}

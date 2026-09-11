@@ -8,6 +8,8 @@ import (
 )
 
 func TestRepository_SetDisabled(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	user := User{
@@ -17,15 +19,15 @@ func TestRepository_SetDisabled(t *testing.T) {
 		Role:         RoleViewer,
 	}
 
-	if err := repository.Insert(user); err != nil {
+	if err := repository.Insert(ctx, user); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	if err := repository.SetDisabled(user.ID, true); err != nil {
+	if err := repository.SetDisabled(ctx, user.ID, true); err != nil {
 		t.Fatalf("SetDisabled() error = %v, want nil", err)
 	}
 
-	got, err := repository.ByID(user.ID)
+	got, err := repository.ByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("ByID() error = %v, want nil", err)
 	}
@@ -34,11 +36,11 @@ func TestRepository_SetDisabled(t *testing.T) {
 		t.Error("Disabled = false, want true")
 	}
 
-	if err := repository.SetDisabled(user.ID, false); err != nil {
+	if err := repository.SetDisabled(ctx, user.ID, false); err != nil {
 		t.Fatalf("SetDisabled() error = %v, want nil", err)
 	}
 
-	got, err = repository.ByID(user.ID)
+	got, err = repository.ByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("ByID() error = %v, want nil", err)
 	}
@@ -49,9 +51,11 @@ func TestRepository_SetDisabled(t *testing.T) {
 }
 
 func TestRepository_SetDisabledNotFound(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
-	err := repository.SetDisabled(uuid.NewV7(), true)
+	err := repository.SetDisabled(ctx, uuid.NewV7(), true)
 
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("SetDisabled() error = %v, want ErrUserNotFound", err)
@@ -59,6 +63,8 @@ func TestRepository_SetDisabledNotFound(t *testing.T) {
 }
 
 func TestRepository_SetRole(t *testing.T) {
+	ctx := t.Context()
+
 	repository := newTestRepository(t)
 
 	account := User{
@@ -68,15 +74,15 @@ func TestRepository_SetRole(t *testing.T) {
 		Role:         RoleViewer,
 	}
 
-	if err := repository.Insert(account); err != nil {
+	if err := repository.Insert(ctx, account); err != nil {
 		t.Fatalf("Insert() error = %v, want nil", err)
 	}
 
-	if err := repository.SetRole(account.ID, RoleAdmin); err != nil {
+	if err := repository.SetRole(ctx, account.ID, RoleAdmin); err != nil {
 		t.Fatalf("SetRole(%v, %q) error = %v, want nil", account.ID, RoleAdmin, err)
 	}
 
-	got, err := repository.ByID(account.ID)
+	got, err := repository.ByID(ctx, account.ID)
 	if err != nil {
 		t.Fatalf("ByID(%v) error = %v, want nil", account.ID, err)
 	}
@@ -87,10 +93,12 @@ func TestRepository_SetRole(t *testing.T) {
 }
 
 func TestRepository_SetRoleNotFound(t *testing.T) {
+	ctx := t.Context()
+
 	id := uuid.NewV7()
 	repository := newTestRepository(t)
 
-	err := repository.SetRole(id, RoleAdmin)
+	err := repository.SetRole(ctx, id, RoleAdmin)
 
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("SetRole(%v, %q) error = %v, want ErrUserNotFound", id, RoleAdmin, err)

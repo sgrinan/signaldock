@@ -127,7 +127,7 @@ func newHTTPClient(parsedURL *url.URL, ips []netip.Addr) (*http.Client, error) {
 
 			host := strings.ToLower(req.URL.Hostname())
 
-			ips, err := ValidateHost(host)
+			ips, err := ValidateHost(req.Context(), host)
 			if err != nil {
 				return err
 			}
