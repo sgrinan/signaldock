@@ -1,6 +1,7 @@
 package probe
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"math"
@@ -13,11 +14,11 @@ import (
 const tlsProbeTimeout = 5 * time.Second
 
 // TLS probes the TLS configuration and certificate of an HTTPS endpoint.
-func TLS(parsedURL *url.URL, ips []netip.Addr) (TLSResult, error) {
-	return tlsProbe(parsedURL, ips, nil)
+func TLS(ctx context.Context, parsedURL *url.URL, ips []netip.Addr) (TLSResult, error) {
+	return tlsProbe(ctx, parsedURL, ips, nil)
 }
 
-func tlsProbe(parsedURL *url.URL, ips []netip.Addr, rootCAs *x509.CertPool) (TLSResult, error) {
+func tlsProbe(ctx context.Context, parsedURL *url.URL, ips []netip.Addr, rootCAs *x509.CertPool) (TLSResult, error) {
 	if parsedURL.Scheme != "https" {
 		return TLSResult{}, nil
 	}
@@ -39,16 +40,23 @@ func tlsProbe(parsedURL *url.URL, ips []netip.Addr, rootCAs *x509.CertPool) (TLS
 		Deadline: time.Now().Add(tlsProbeTimeout),
 	}
 
+	tlsDialer := &tls.Dialer{
+		NetDialer: dialer,
+		Config:    config,
+	}
+
 	var lastErr error
 
 	for _, ip := range ips {
 		target := net.JoinHostPort(ip.String(), port)
 
-		conn, err := tls.DialWithDialer(dialer, "tcp", target, config)
+		rawConn, err := tlsDialer.DialContext(ctx, "tcp", target)
 		if err != nil {
 			lastErr = err
 			continue
 		}
+
+		conn := rawConn.(*tls.Conn)
 
 		state := conn.ConnectionState()
 		_ = conn.Close()

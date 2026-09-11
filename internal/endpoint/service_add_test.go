@@ -188,7 +188,7 @@ func TestService_Add(t *testing.T) {
 
 		httpErr := errors.New("HTTP failed")
 
-		s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
+		s.probeHTTP = func(context.Context, *url.URL, []netip.Addr) (probe.HTTPResult, error) {
 			return probe.HTTPResult{
 				Responded: false,
 			}, httpErr
@@ -284,7 +284,7 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 	var httpCalls atomic.Int32
 	var tlsCalls atomic.Int32
 
-	s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
+	s.probeHTTP = func(context.Context, *url.URL, []netip.Addr) (probe.HTTPResult, error) {
 		httpCalls.Add(1)
 
 		time.Sleep(50 * time.Millisecond)
@@ -295,7 +295,7 @@ func TestService_AddConcurrentDuplicate(t *testing.T) {
 		}, nil
 	}
 
-	s.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+	s.probeTLS = func(context.Context, *url.URL, []netip.Addr) (probe.TLSResult, error) {
 		tlsCalls.Add(1)
 
 		return probe.TLSResult{

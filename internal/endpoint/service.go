@@ -19,8 +19,8 @@ type Service struct {
 	checks     checkStore
 
 	validateHost func(context.Context, string) ([]netip.Addr, error)
-	probeHTTP    func(*url.URL, []netip.Addr) (probe.HTTPResult, error)
-	probeTLS     func(*url.URL, []netip.Addr) (probe.TLSResult, error)
+	probeHTTP    func(context.Context, *url.URL, []netip.Addr) (probe.HTTPResult, error)
+	probeTLS     func(context.Context, *url.URL, []netip.Addr) (probe.TLSResult, error)
 }
 
 type endpointRepository interface {
@@ -87,7 +87,7 @@ func (s *Service) Add(ctx context.Context, rawURL string) (Endpoint, error) {
 		return Endpoint{}, err
 	}
 
-	lastCheck, checkErr := s.check(parsedURL, ips)
+	lastCheck, checkErr := s.check(ctx, parsedURL, ips)
 
 	s.checks.Set(ep.ID, lastCheck)
 	ep.LastCheck = lastCheck
@@ -119,7 +119,7 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID) (CheckResult, error
 		}
 	}
 
-	lastCheck, checkErr := s.check(parsedURL, ips)
+	lastCheck, checkErr := s.check(ctx, parsedURL, ips)
 
 	s.checks.Set(id, lastCheck)
 
@@ -180,9 +180,9 @@ func (s *Service) validateEndpointHost(ctx context.Context, parsedURL *url.URL) 
 
 // check runs the HTTP and TLS probes independently so both results and
 // failures are preserved.
-func (s *Service) check(parsedURL *url.URL, ips []netip.Addr) (CheckResult, error) {
-	httpResult, httpErr := s.probeHTTP(parsedURL, ips)
-	tlsResult, tlsErr := s.probeTLS(parsedURL, ips)
+func (s *Service) check(ctx context.Context, parsedURL *url.URL, ips []netip.Addr) (CheckResult, error) {
+	httpResult, httpErr := s.probeHTTP(ctx, parsedURL, ips)
+	tlsResult, tlsErr := s.probeTLS(ctx, parsedURL, ips)
 
 	result := CheckResult{
 		HTTP: httpResult,

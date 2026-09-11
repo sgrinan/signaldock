@@ -36,11 +36,11 @@ func TestService_Refresh(t *testing.T) {
 			},
 		}
 
-		s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
+		s.probeHTTP = func(context.Context, *url.URL, []netip.Addr) (probe.HTTPResult, error) {
 			return want.HTTP, nil
 		}
 
-		s.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+		s.probeTLS = func(context.Context, *url.URL, []netip.Addr) (probe.TLSResult, error) {
 			return want.TLS, nil
 		}
 
@@ -150,7 +150,7 @@ func TestService_Refresh(t *testing.T) {
 			Responded: false,
 		}
 
-		s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
+		s.probeHTTP = func(context.Context, *url.URL, []netip.Addr) (probe.HTTPResult, error) {
 			return wantHTTP, httpErr
 		}
 

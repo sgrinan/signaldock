@@ -19,12 +19,12 @@ const (
 )
 
 // HTTP probes an endpoint and reports whether an HTTP response was received.
-func HTTP(parsedURL *url.URL, ips []netip.Addr) (HTTPResult, error) {
+func HTTP(ctx context.Context, parsedURL *url.URL, ips []netip.Addr) (HTTPResult, error) {
 	if len(ips) == 0 {
 		return HTTPResult{}, ErrUnsafeHost
 	}
 
-	resp, latency, err := doRequest(parsedURL, ips)
+	resp, latency, err := doRequest(ctx, parsedURL, ips)
 	checkedAt := time.Now()
 
 	if err != nil {
@@ -143,15 +143,20 @@ func newHTTPClient(parsedURL *url.URL, ips []netip.Addr) (*http.Client, error) {
 	return &client, nil
 }
 
-func doRequest(parsedURL *url.URL, ips []netip.Addr) (*http.Response, time.Duration, error) {
+func doRequest(ctx context.Context, parsedURL *url.URL, ips []netip.Addr) (*http.Response, time.Duration, error) {
 	client, err := newHTTPClient(parsedURL, ips)
 	if err != nil {
 		return nil, 0, err
 	}
 
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsedURL.String(), nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("create HTTP request: %w", err)
+	}
+
 	start := time.Now()
 
-	resp, err := client.Get(parsedURL.String())
+	resp, err := client.Do(req)
 
 	latency := time.Since(start)
 

@@ -1,6 +1,7 @@
 package probe
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -111,7 +112,7 @@ func TestHTTP(t *testing.T) {
 
 		parsedURL := mustParseURL(t, server.URL)
 
-		got, err := HTTP(parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
+		got, err := HTTP(t.Context(), parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
 		if err != nil {
 			t.Fatalf("HTTP(%q) returned unexpected error: %v", parsedURL, err)
 		}
@@ -145,7 +146,7 @@ func TestHTTP(t *testing.T) {
 
 		server.Close()
 
-		got, err := HTTP(parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
+		got, err := HTTP(t.Context(), parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
 
 		if err == nil {
 			t.Fatal("HTTP() error = nil, want non-nil")
@@ -167,7 +168,7 @@ func TestHTTP(t *testing.T) {
 	t.Run("no_addresses", func(t *testing.T) {
 		parsedURL := mustParseURL(t, "https://example.com/")
 
-		got, err := HTTP(parsedURL, nil)
+		got, err := HTTP(t.Context(), parsedURL, nil)
 
 		if !errors.Is(err, ErrUnsafeHost) {
 			t.Errorf("HTTP(%q, nil) error = %v, want %v", parsedURL, err, ErrUnsafeHost)
@@ -188,7 +189,7 @@ func TestHTTP(t *testing.T) {
 
 		parsedURL := mustParseURL(t, server.URL)
 
-		got, err := HTTP(parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
+		got, err := HTTP(t.Context(), parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
 
 		if !errors.Is(err, ErrUnsafeHost) {
 			t.Fatalf("HTTP(%q) error = %v, want %v", parsedURL, err, ErrUnsafeHost)
@@ -200,6 +201,24 @@ func TestHTTP(t *testing.T) {
 
 		if got.StatusCode != http.StatusFound {
 			t.Errorf("HTTP(%q).StatusCode = %d, want %d", parsedURL, got.StatusCode, http.StatusFound)
+		}
+	})
+
+	t.Run("canceled_context", func(t *testing.T) {
+		server := httptest.NewServer(
+			http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+		)
+		t.Cleanup(server.Close)
+
+		parsedURL := mustParseURL(t, server.URL)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		_, err := HTTP(ctx, parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
+
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("HTTP() error = %v, want %v", err, context.Canceled)
 		}
 	})
 }

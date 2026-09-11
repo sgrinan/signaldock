@@ -37,14 +37,14 @@ func newTestService() (*Service, *fakeRepository, *fakeCheckStore) {
 		return ips, nil
 	}
 
-	s.probeHTTP = func(*url.URL, []netip.Addr) (probe.HTTPResult, error) {
+	s.probeHTTP = func(context.Context, *url.URL, []netip.Addr) (probe.HTTPResult, error) {
 		return probe.HTTPResult{
 			StatusCode: 200,
 			Responded:  true,
 		}, nil
 	}
 
-	s.probeTLS = func(*url.URL, []netip.Addr) (probe.TLSResult, error) {
+	s.probeTLS = func(context.Context, *url.URL, []netip.Addr) (probe.TLSResult, error) {
 		return probe.TLSResult{
 			Enabled: true,
 			Valid:   true,

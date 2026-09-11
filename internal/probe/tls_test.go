@@ -1,9 +1,13 @@
 package probe
 
 import (
+	"context"
 	"crypto/x509"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"net/netip"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -12,7 +16,7 @@ func TestTLS(t *testing.T) {
 	t.Run("non_https", func(t *testing.T) {
 		parsedURL := mustParseURL(t, "http://example.com/")
 
-		got, err := TLS(parsedURL, nil)
+		got, err := TLS(t.Context(), parsedURL, nil)
 		if err != nil {
 			t.Fatalf("TLS(%q) error = %v, want nil", parsedURL, err)
 		}
@@ -25,7 +29,7 @@ func TestTLS(t *testing.T) {
 	t.Run("no_addresses", func(t *testing.T) {
 		parsedURL := mustParseURL(t, "https://example.com/")
 
-		got, err := TLS(parsedURL, nil)
+		got, err := TLS(t.Context(), parsedURL, nil)
 
 		if !errors.Is(err, ErrUnsafeHost) {
 			t.Errorf("TLS(%q, nil) error = %v, want %v", parsedURL, err, ErrUnsafeHost)
@@ -43,7 +47,7 @@ func TestTLSProbe(t *testing.T) {
 
 		_, parsedURL, ips, roots, cert := newTLSTestServer(t, "localhost", now.Add(-time.Hour), now.Add(72*time.Hour))
 
-		got, err := tlsProbe(parsedURL, ips, roots)
+		got, err := tlsProbe(t.Context(), parsedURL, ips, roots)
 		if err != nil {
 			t.Fatalf("tlsProbe(%q) error = %v, want nil", parsedURL, err)
 		}
@@ -70,7 +74,7 @@ func TestTLSProbe(t *testing.T) {
 
 		_, parsedURL, ips, roots, cert := newTLSTestServer(t, "localhost", now.Add(-72*time.Hour), now.Add(-time.Hour))
 
-		got, err := tlsProbe(parsedURL, ips, roots)
+		got, err := tlsProbe(t.Context(), parsedURL, ips, roots)
 		if err == nil {
 			t.Fatalf("tlsProbe(%q) error = nil, want certificate validation error", parsedURL)
 		}
@@ -99,7 +103,7 @@ func TestTLSProbe(t *testing.T) {
 
 		untrustedRoots := x509.NewCertPool()
 
-		got, err := tlsProbe(parsedURL, ips, untrustedRoots)
+		got, err := tlsProbe(t.Context(), parsedURL, ips, untrustedRoots)
 		if err == nil {
 			t.Fatalf("tlsProbe(%q) error = nil, want certificate validation error", parsedURL)
 		}
@@ -124,7 +128,7 @@ func TestTLSProbe(t *testing.T) {
 
 		parsedURL = mustParseURL(t, "https://example.com:"+parsedURL.Port())
 
-		got, err := tlsProbe(parsedURL, ips, roots)
+		got, err := tlsProbe(t.Context(), parsedURL, ips, roots)
 		if err == nil {
 			t.Fatalf("tlsProbe(%q) error = nil, want hostname validation error", parsedURL)
 		}
@@ -149,7 +153,7 @@ func TestTLSProbe(t *testing.T) {
 
 		server.Close()
 
-		got, err := tlsProbe(parsedURL, ips, roots)
+		got, err := tlsProbe(t.Context(), parsedURL, ips, roots)
 		if err == nil {
 			t.Fatalf("tlsProbe(%q) error = nil, want connection error", parsedURL)
 		}
@@ -174,7 +178,7 @@ func TestTLSProbe(t *testing.T) {
 
 		ips = append([]netip.Addr{netip.MustParseAddr("127.0.0.2")}, ips...)
 
-		got, err := tlsProbe(parsedURL, ips, roots)
+		got, err := tlsProbe(t.Context(), parsedURL, ips, roots)
 		if err != nil {
 			t.Fatalf("tlsProbe(%q) error = %v, want nil", parsedURL, err)
 		}
@@ -231,5 +235,26 @@ func TestDaysBetween(t *testing.T) {
 				t.Errorf("daysBetween(%v, %v) = %d, want %d", now, tt.expiresAt, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestTLSCanceledContext(t *testing.T) {
+	server := httptest.NewTLSServer(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+	)
+	t.Cleanup(server.Close)
+
+	parsedURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("url.Parse() error = %v, want nil", err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err = TLS(ctx, parsedURL, []netip.Addr{netip.MustParseAddr("127.0.0.1")})
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("TLS() error = %v, want %v", err, context.Canceled)
 	}
 }
