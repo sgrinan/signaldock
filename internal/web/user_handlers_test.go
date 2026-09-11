@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,6 +13,72 @@ import (
 	"github.com/sgrinan/signaldock/internal/auth"
 	"github.com/sgrinan/signaldock/internal/user"
 )
+
+func TestHandler_HandleGetUsers(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		h := newTestHandler(&fakeEndpointService{})
+
+		current := user.User{
+			ID:       uuid.NewV7(),
+			Username: "admin",
+			Role:     user.RoleAdmin,
+		}
+
+		h.users = &fakeUserRepository{
+			listFunc: func() ([]user.User, error) {
+				return []user.User{
+					current,
+					{
+						ID:       uuid.NewV7(),
+						Username: "viewer",
+						Role:     user.RoleViewer,
+					},
+				}, nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/users", nil)
+		req = withCurrentUser(req, current)
+
+		recorder := httptest.NewRecorder()
+
+		h.handleGetUsers(recorder, req)
+
+		if got, want := recorder.Code, http.StatusOK; got != want {
+			t.Errorf("handleGetUsers() status = %d, want %d", got, want)
+		}
+
+		if got, want := recorder.Body.String(), "|2|csrf"; got != want {
+			t.Errorf("handleGetUsers() body = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("repository_error", func(t *testing.T) {
+		h := newTestHandler(&fakeEndpointService{})
+
+		repositoryErr := errors.New("repository failed")
+
+		h.users = &fakeUserRepository{
+			listFunc: func() ([]user.User, error) {
+				return nil, repositoryErr
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/users", nil)
+		req = withCurrentUser(req, user.User{
+			ID:   uuid.NewV7(),
+			Role: user.RoleAdmin,
+		})
+
+		recorder := httptest.NewRecorder()
+
+		h.handleGetUsers(recorder, req)
+
+		if got, want := recorder.Code, http.StatusInternalServerError; got != want {
+			t.Errorf("handleGetUsers() status = %d, want %d", got, want)
+		}
+	})
+}
 
 func TestHandler_HandlePostUser(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
@@ -231,4 +298,266 @@ func TestHandler_HandleDeleteUserSelf(t *testing.T) {
 	if called {
 		t.Error("handleDeleteUser() called RemoveByID() for current user")
 	}
+}
+
+func TestHandler_HandleDeleteUser(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		h := newTestHandler(&fakeEndpointService{})
+
+		currentID := uuid.NewV7()
+		targetID := uuid.NewV7()
+
+		var removedID uuid.UUID
+
+		h.users = &fakeUserRepository{
+			removeByIDFunc: func(id uuid.UUID) error {
+				removedID = id
+				return nil
+			},
+		}
+
+		req := newCSRFPostRequest(t, "/users/"+targetID.String()+"/delete", nil)
+		req.SetPathValue("id", targetID.String())
+
+		req = withCurrentUser(req, user.User{
+			ID:   currentID,
+			Role: user.RoleAdmin,
+		})
+
+		recorder := httptest.NewRecorder()
+
+		h.handleDeleteUser(recorder, req)
+
+		if got, want := recorder.Code, http.StatusSeeOther; got != want {
+			t.Errorf("handleDeleteUser() status = %d, want %d", got, want)
+		}
+
+		if got, want := recorder.Header().Get("Location"), "/users"; got != want {
+			t.Errorf("handleDeleteUser() Location = %q, want %q", got, want)
+		}
+
+		if got, want := removedID, targetID; got != want {
+			t.Errorf("RemoveByID() id = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("not_found", func(t *testing.T) {
+		h := newTestHandler(&fakeEndpointService{})
+
+		targetID := uuid.NewV7()
+
+		h.users = &fakeUserRepository{
+			removeByIDFunc: func(uuid.UUID) error {
+				return user.ErrUserNotFound
+			},
+		}
+
+		req := newCSRFPostRequest(t, "/users/"+targetID.String()+"/delete", nil)
+		req.SetPathValue("id", targetID.String())
+
+		req = withCurrentUser(req, user.User{
+			ID:   uuid.NewV7(),
+			Role: user.RoleAdmin,
+		})
+
+		recorder := httptest.NewRecorder()
+
+		h.handleDeleteUser(recorder, req)
+
+		if got, want := recorder.Code, http.StatusNotFound; got != want {
+			t.Errorf("handleDeleteUser() status = %d, want %d", got, want)
+		}
+	})
+}
+
+func TestHandler_HandleUpdateUser(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		h := newTestHandler(&fakeEndpointService{})
+
+		currentID := uuid.NewV7()
+		targetID := uuid.NewV7()
+
+		var (
+			gotRole     user.Role
+			gotDisabled bool
+		)
+
+		h.users = &fakeUserRepository{
+			setRoleFunc: func(id uuid.UUID, role user.Role) error {
+				if got, want := id, targetID; got != want {
+					t.Errorf("SetRole() id = %v, want %v", got, want)
+				}
+
+				gotRole = role
+				return nil
+			},
+
+			setDisabledFunc: func(id uuid.UUID, disabled bool) error {
+				if got, want := id, targetID; got != want {
+					t.Errorf("SetDisabled() id = %v, want %v", got, want)
+				}
+
+				gotDisabled = disabled
+				return nil
+			},
+		}
+
+		form := url.Values{}
+		form.Set("role", "admin")
+		form.Set("disabled", "true")
+
+		req := newCSRFPostRequest(t, "/users/"+targetID.String(), form)
+		req.SetPathValue("id", targetID.String())
+
+		req = withCurrentUser(req, user.User{
+			ID:   currentID,
+			Role: user.RoleAdmin,
+		})
+
+		recorder := httptest.NewRecorder()
+
+		h.handleUpdateUser(recorder, req)
+
+		if got, want := recorder.Code, http.StatusSeeOther; got != want {
+			t.Errorf("handleUpdateUser() status = %d, want %d", got, want)
+		}
+
+		if got, want := recorder.Header().Get("Location"), "/users"; got != want {
+			t.Errorf("handleUpdateUser() Location = %q, want %q", got, want)
+		}
+
+		if got, want := gotRole, user.RoleAdmin; got != want {
+			t.Errorf("SetRole() role = %q, want %q", got, want)
+		}
+
+		if got, want := gotDisabled, true; got != want {
+			t.Errorf("SetDisabled() disabled = %t, want %t", got, want)
+		}
+	})
+
+	t.Run("self_update", func(t *testing.T) {
+		h := newTestHandler(&fakeEndpointService{})
+
+		currentID := uuid.NewV7()
+
+		called := false
+
+		h.users = &fakeUserRepository{
+			setRoleFunc: func(uuid.UUID, user.Role) error {
+				called = true
+				return nil
+			},
+
+			setDisabledFunc: func(uuid.UUID, bool) error {
+				called = true
+				return nil
+			},
+		}
+
+		form := url.Values{}
+		form.Set("role", "viewer")
+		form.Set("disabled", "true")
+
+		req := newCSRFPostRequest(t, "/users/"+currentID.String(), form)
+		req.SetPathValue("id", currentID.String())
+
+		req = withCurrentUser(req, user.User{
+			ID:   currentID,
+			Role: user.RoleAdmin,
+		})
+
+		recorder := httptest.NewRecorder()
+
+		h.handleUpdateUser(recorder, req)
+
+		if got, want := recorder.Code, http.StatusBadRequest; got != want {
+			t.Errorf("handleUpdateUser() status = %d, want %d", got, want)
+		}
+
+		if called {
+			t.Error("handleUpdateUser() modified current user, want no repository call")
+		}
+	})
+
+	t.Run("invalid_id", func(t *testing.T) {
+		h := newTestHandler(&fakeEndpointService{})
+
+		req := newCSRFPostRequest(t, "/users/invalid", url.Values{
+			"role":     {"viewer"},
+			"disabled": {"false"},
+		},
+		)
+		req.SetPathValue("id", "invalid")
+
+		req = withCurrentUser(req, user.User{
+			ID:   uuid.NewV7(),
+			Role: user.RoleAdmin,
+		})
+
+		recorder := httptest.NewRecorder()
+
+		h.handleUpdateUser(recorder, req)
+
+		if got, want := recorder.Code, http.StatusBadRequest; got != want {
+			t.Errorf("handleUpdateUser() status = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("invalid_role", func(t *testing.T) {
+		h := newTestHandler(&fakeEndpointService{})
+
+		targetID := uuid.NewV7()
+
+		req := newCSRFPostRequest(t, "/users/"+targetID.String(), url.Values{
+			"role":     {"superadmin"},
+			"disabled": {"false"},
+		},
+		)
+		req.SetPathValue("id", targetID.String())
+
+		req = withCurrentUser(req, user.User{
+			ID:   uuid.NewV7(),
+			Role: user.RoleAdmin,
+		})
+
+		recorder := httptest.NewRecorder()
+
+		h.handleUpdateUser(recorder, req)
+
+		if got, want := recorder.Code, http.StatusBadRequest; got != want {
+			t.Errorf("handleUpdateUser() status = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("not_found", func(t *testing.T) {
+		h := newTestHandler(&fakeEndpointService{})
+
+		targetID := uuid.NewV7()
+
+		h.users = &fakeUserRepository{
+			setRoleFunc: func(uuid.UUID, user.Role) error {
+				return user.ErrUserNotFound
+			},
+		}
+
+		req := newCSRFPostRequest(t, "/users/"+targetID.String(), url.Values{
+			"role":     {"viewer"},
+			"disabled": {"false"},
+		},
+		)
+		req.SetPathValue("id", targetID.String())
+
+		req = withCurrentUser(req, user.User{
+			ID:   uuid.NewV7(),
+			Role: user.RoleAdmin,
+		})
+
+		recorder := httptest.NewRecorder()
+
+		h.handleUpdateUser(recorder, req)
+
+		if got, want := recorder.Code, http.StatusNotFound; got != want {
+			t.Errorf("handleUpdateUser() status = %d, want %d", got, want)
+		}
+	})
 }
