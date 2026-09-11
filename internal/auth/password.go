@@ -77,12 +77,20 @@ func VerifyPassword(password, encodedHash string) (bool, error) {
 		return false, fmt.Errorf("decode password salt: %w", err)
 	}
 
+	if len(salt) != saltLength {
+		return false, fmt.Errorf("invalid password salt length")
+	}
+
 	expectedHash, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil {
 		return false, fmt.Errorf("decode password hash: %w", err)
 	}
 
-	actualHash := argon2.IDKey([]byte(password), salt, hashIterations, hashMemory, hashParallelism, uint32(len(expectedHash)))
+	if len(expectedHash) != keyLength {
+		return false, fmt.Errorf("invalid password hash length")
+	}
+
+	actualHash := argon2.IDKey([]byte(password), salt, hashIterations, hashMemory, hashParallelism, keyLength)
 
 	return subtle.ConstantTimeCompare(actualHash, expectedHash) == 1, nil
 }
