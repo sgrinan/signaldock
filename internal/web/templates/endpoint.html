@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -7,7 +8,10 @@
 
     <title>Endpoint · SignalDock</title>
 
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/base.css">
+    <link rel="stylesheet" href="/static/components.css">
+    <link rel="stylesheet" href="/static/endpoints.css">
+
     <script src="/static/time.js" defer></script>
 </head>
 
@@ -17,40 +21,36 @@
 
     <header class="site-header">
         <div class="container">
-            <a class="brand" href="/">SignalDock</a>
+            <a class="site-brand" href="/">SignalDock</a>
 
-            <div class="header-actions">
-                <span class="header-label">
+            <div class="site-header-actions">
+                <span class="site-header-label">
                     {{ .CurrentUser.Username }} · {{ .CurrentUser.Role }}
                 </span>
 
                 {{ if eq .CurrentUser.Role "admin" }}
-                    <a
-                        class="button button-secondary"
-                        href="/users"
-                    >
-                        Users
-                    </a>
+                <a
+                   class="button button-secondary"
+                   href="/users">
+                    Users
+                </a>
                 {{ end }}
 
                 <form method="POST" action="/logout">
                     <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="{{ .CSRFToken }}"
-                    >
+                           type="hidden"
+                           name="csrf_token"
+                           value="{{ .CSRFToken }}">
 
                     <button
-                        class="button button-secondary"
-                        type="submit"
-                    >
+                            class="button button-secondary"
+                            type="submit">
                         Sign out
                     </button>
                 </form>
             </div>
         </div>
     </header>
-
 
     <!-- Main content -->
 
@@ -62,12 +62,11 @@
             &lt; Back to endpoints
         </a>
 
-
         <!-- Endpoint header -->
 
         <section class="endpoint-detail-header">
             <div>
-                <div class="endpoint-title-row">
+                <div class="endpoint-detail-title-row">
                     <h1>Endpoint</h1>
 
                     <span class="status-badge {{ .StateClass }}">
@@ -80,241 +79,187 @@
                 </p>
             </div>
 
-
             <!-- Admin controls -->
 
             {{ if eq .CurrentUser.Role "admin" }}
+            <form
+                  method="POST"
+                  action="/endpoints/{{ .Endpoint.ID }}/refresh">
+                <input
+                       type="hidden"
+                       name="csrf_token"
+                       value="{{ .CSRFToken }}">
 
-                <form
-                    method="POST"
-                    action="/endpoints/{{ .Endpoint.ID }}/refresh"
-                >
-                    <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="{{ .CSRFToken }}"
-                    >
-
-                    <button
+                <button
                         class="button-primary"
-                        type="submit"
-                    >
-                        Check now
-                    </button>
-                </form>
-
+                        type="submit">
+                    Check now
+                </button>
+            </form>
             {{ end }}
-
         </section>
-
 
         <!-- Checking state -->
 
         {{ if .Checking }}
-
-            <section class="detail-section">
-                <div class="detail-message">
-                    Initial check in progress
-                </div>
-            </section>
-
+        <section class="endpoint-detail-section">
+            <div class="endpoint-detail-message">
+                Initial check in progress
+            </div>
+        </section>
 
         {{ else }}
 
-            <!-- Metrics -->
+        <!-- Metrics -->
 
-            <div class="detail-grid">
+        <div class="endpoint-detail-grid">
 
+            <!-- HTTP -->
 
-                <!-- HTTP -->
+            <section class="endpoint-detail-section">
+                <h2>HTTP</h2>
 
-                <section class="detail-section">
-                    <h2>HTTP</h2>
-
-                    <div class="detail-table">
-
-                        <div class="detail-row">
-                            <span class="detail-label">
-                                Responded
-                            </span>
-
-                            {{ if .Endpoint.LastCheck.HTTP.Responded }}
-
-                                <span class="status-badge status-ok">
-                                    Yes
-                                </span>
-
-                            {{ else }}
-
-                                <span class="status-badge status-error">
-                                    No
-                                </span>
-
-                            {{ end }}
-                        </div>
-
+                <div class="endpoint-detail-table">
+                    <div class="endpoint-detail-row">
+                        <span class="endpoint-detail-label">
+                            Responded
+                        </span>
 
                         {{ if .Endpoint.LastCheck.HTTP.Responded }}
-
-                            <div class="detail-row">
-                                <span class="detail-label">
-                                    Status
-                                </span>
-
-                                <strong class="detail-value">
-                                    {{ .Endpoint.LastCheck.HTTP.StatusCode }}
-                                </strong>
-                            </div>
-
+                        <span class="status-badge status-ok">
+                            Yes
+                        </span>
+                        {{ else }}
+                        <span class="status-badge status-error">
+                            No
+                        </span>
                         {{ end }}
-
-
-                        <div class="detail-row">
-                            <span class="detail-label">
-                                Latency
-                            </span>
-
-                            <strong class="detail-value">
-                                {{ if .Endpoint.LastCheck.HTTP.Responded }}
-
-                                    {{ .LatencyMS }} ms
-
-                                {{ else }}
-
-                                    —
-
-                                {{ end }}
-                            </strong>
-                        </div>
-
-
-                        {{ if not .LastCheckedAt.IsZero }}
-
-                            <div class="detail-row">
-                                <span class="detail-label">
-                                    Last checked
-                                </span>
-
-                                <strong class="detail-value">
-                                    <time
-                                        data-local-time
-                                        datetime="{{ .LastCheckedAt.Format "2006-01-02T15:04:05Z07:00" }}"
-                                    >
-                                        {{ .LastCheckedAt.Format "15:04:05" }}
-                                    </time>
-                                </strong>
-                            </div>
-
-                        {{ end }}
-
                     </div>
-                </section>
 
+                    {{ if .Endpoint.LastCheck.HTTP.Responded }}
+                    <div class="endpoint-detail-row">
+                        <span class="endpoint-detail-label">
+                            Status
+                        </span>
 
-                <!-- TLS -->
+                        <strong class="endpoint-detail-value">
+                            {{ .Endpoint.LastCheck.HTTP.StatusCode }}
+                        </strong>
+                    </div>
+                    {{ end }}
 
-                <section class="detail-section">
-                    <h2>TLS</h2>
+                    <div class="endpoint-detail-row">
+                        <span class="endpoint-detail-label">
+                            Latency
+                        </span>
 
-                    <div class="detail-table">
-
-                        <div class="detail-row">
-                            <span class="detail-label">
-                                Enabled
-                            </span>
-
-                            {{ if .Endpoint.LastCheck.TLS.Enabled }}
-
-                                <span class="status-badge status-ok">
-                                    Yes
-                                </span>
-
+                        <strong class="endpoint-detail-value">
+                            {{ if .Endpoint.LastCheck.HTTP.Responded }}
+                            {{ .LatencyMS }} ms
                             {{ else }}
-
-                                <span class="status-badge status-pending">
-                                    No
-                                </span>
-
+                            —
                             {{ end }}
-                        </div>
+                        </strong>
+                    </div>
 
+                    {{ if not .LastCheckedAt.IsZero }}
+                    <div class="endpoint-detail-row">
+                        <span class="endpoint-detail-label">
+                            Last checked
+                        </span>
+
+                        <strong class="endpoint-detail-value">
+                            <time
+                                  data-local-time
+                                  datetime="{{ .LastCheckedAt.Format "2006-01-02T15:04:05Z07:00" }}">
+                                {{ .LastCheckedAt.Format "15:04:05" }}
+                            </time>
+                        </strong>
+                    </div>
+                    {{ end }}
+                </div>
+            </section>
+
+            <!-- TLS -->
+
+            <section class="endpoint-detail-section">
+                <h2>TLS</h2>
+
+                <div class="endpoint-detail-table">
+                    <div class="endpoint-detail-row">
+                        <span class="endpoint-detail-label">
+                            Enabled
+                        </span>
 
                         {{ if .Endpoint.LastCheck.TLS.Enabled }}
-
-                            {{ if .TLSExpiresAt }}
-
-                                <div class="detail-row">
-                                    <span class="detail-label">
-                                        Valid
-                                    </span>
-
-                                    {{ if .Endpoint.LastCheck.TLS.Valid }}
-
-                                        <span class="status-badge status-ok">
-                                            Valid
-                                        </span>
-
-                                    {{ else }}
-
-                                        <span class="status-badge status-error">
-                                            Invalid
-                                        </span>
-
-                                    {{ end }}
-                                </div>
-
-
-                                <div class="detail-row">
-                                    <span class="detail-label">
-                                        Expires
-                                    </span>
-
-                                    <strong class="detail-value">
-                                        {{ .TLSExpiresAt }}
-                                    </strong>
-                                </div>
-
-
-                                <div class="detail-row">
-                                    <span class="detail-label">
-                                        Days remaining
-                                    </span>
-
-                                    <strong class="detail-value {{ .TLSDaysClass }}">
-                                        {{ .Endpoint.LastCheck.TLS.DaysRemaining }}
-                                    </strong>
-                                </div>
-
-
-                            {{ else }}
-
-                                <div class="detail-message">
-                                    Certificate information unavailable
-                                </div>
-
-                            {{ end }}
-
-
+                        <span class="status-badge status-ok">
+                            Yes
+                        </span>
                         {{ else }}
-
-                            <div class="detail-message">
-                                TLS is not enabled for this endpoint
-                            </div>
-
+                        <span class="status-badge status-pending">
+                            No
+                        </span>
                         {{ end }}
-
                     </div>
-                </section>
 
-            </div>
+                    {{ if .Endpoint.LastCheck.TLS.Enabled }}
+                    {{ if .TLSExpiresAt }}
+                    <div class="endpoint-detail-row">
+                        <span class="endpoint-detail-label">
+                            Valid
+                        </span>
 
+                        {{ if .Endpoint.LastCheck.TLS.Valid }}
+                        <span class="status-badge status-ok">
+                            Valid
+                        </span>
+                        {{ else }}
+                        <span class="status-badge status-error">
+                            Invalid
+                        </span>
+                        {{ end }}
+                    </div>
+
+                    <div class="endpoint-detail-row">
+                        <span class="endpoint-detail-label">
+                            Expires
+                        </span>
+
+                        <strong class="endpoint-detail-value">
+                            {{ .TLSExpiresAt }}
+                        </strong>
+                    </div>
+
+                    <div class="endpoint-detail-row">
+                        <span class="endpoint-detail-label">
+                            Days remaining
+                        </span>
+
+                        <strong class="endpoint-detail-value {{ .TLSDaysClass }}">
+                            {{ .Endpoint.LastCheck.TLS.DaysRemaining }}
+                        </strong>
+                    </div>
+
+                    {{ else }}
+                    <div class="endpoint-detail-message">
+                        Certificate information unavailable
+                    </div>
+                    {{ end }}
+
+                    {{ else }}
+                    <div class="endpoint-detail-message">
+                        TLS is not enabled for this endpoint
+                    </div>
+                    {{ end }}
+                </div>
+            </section>
+        </div>
         {{ end }}
-
 
         <!-- Monitoring -->
 
-        <section class="monitoring-section">
-            <div class="section-heading">
+        <section class="endpoint-monitoring-section">
+            <div class="section-header">
                 <div>
                     <h2>Monitoring</h2>
 
@@ -324,44 +269,38 @@
                 </div>
             </div>
 
-            <div class="monitoring-placeholder">
+            <div class="endpoint-monitoring-placeholder">
                 Prometheus / Grafana integration
             </div>
         </section>
 
-
         <!-- Admin danger zone -->
 
         {{ if eq .CurrentUser.Role "admin" }}
+        <section class="endpoint-danger-zone">
+            <div>
+                <h2>Danger zone</h2>
 
-            <section class="danger-zone">
-                <div>
-                    <h2>Danger zone</h2>
+                <p>
+                    Remove this endpoint from SignalDock.
+                </p>
+            </div>
 
-                    <p>
-                        Remove this endpoint from SignalDock.
-                    </p>
-                </div>
+            <form
+                  method="POST"
+                  action="/endpoints/{{ .Endpoint.ID }}/delete">
+                <input
+                       type="hidden"
+                       name="csrf_token"
+                       value="{{ .CSRFToken }}">
 
-                <form
-                    method="POST"
-                    action="/endpoints/{{ .Endpoint.ID }}/delete"
-                >
-                    <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="{{ .CSRFToken }}"
-                    >
-
-                    <button
+                <button
                         class="button-danger"
-                        type="submit"
-                    >
-                        Remove endpoint
-                    </button>
-                </form>
-            </section>
-
+                        type="submit">
+                    Remove endpoint
+                </button>
+            </form>
+        </section>
         {{ end }}
 
     </main>

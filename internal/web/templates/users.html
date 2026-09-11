@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -7,7 +8,9 @@
 
     <title>Users · SignalDock</title>
 
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/base.css">
+    <link rel="stylesheet" href="/static/components.css">
+    <link rel="stylesheet" href="/static/users.css">
 </head>
 
 <body>
@@ -16,31 +19,28 @@
 
     <header class="site-header">
         <div class="container">
-            <a class="brand" href="/">SignalDock</a>
+            <a class="site-brand" href="/">SignalDock</a>
 
-            <div class="header-actions">
-                <span class="header-label">
+            <div class="site-header-actions">
+                <span class="site-header-label">
                     {{ .CurrentUser.Username }} · {{ .CurrentUser.Role }}
                 </span>
 
                 <form method="POST" action="/logout">
                     <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="{{ .CSRFToken }}"
-                    >
+                           type="hidden"
+                           name="csrf_token"
+                           value="{{ .CSRFToken }}">
 
                     <button
-                        class="button button-secondary"
-                        type="submit"
-                    >
+                            class="button button-secondary"
+                            type="submit">
                         Sign out
                     </button>
                 </form>
             </div>
         </div>
     </header>
-
 
     <!-- Main content -->
 
@@ -50,249 +50,205 @@
             &lt; Back to endpoints
         </a>
 
-
         <!-- Users -->
 
-        <section class="users-section">
-
-            <div class="section-heading">
+        <section class="user-management-section">
+            <div class="section-header">
                 <div>
                     <h1>Users</h1>
                     <p>Manage access to SignalDock.</p>
                 </div>
 
-                <span class="endpoint-count">
+                <span class="section-count">
                     {{ len .Users }}
                 </span>
             </div>
 
-
             <!-- Error -->
 
             {{ if .Error }}
-                <div class="alert" role="alert">
-                    <span>{{ .Error }}</span>
-                </div>
+            <div class="alert" role="alert">
+                <span>{{ .Error }}</span>
+            </div>
             {{ end }}
-
 
             <!-- Users table -->
 
             {{ if .Users }}
+            <div class="users-table-wrapper">
+                <table class="users-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
 
-                <div class="users-table-wrapper">
+                    <tbody>
+                        {{ range .Users }}
+                        <tr>
 
-                    <table class="users-table">
+                            <!-- Username -->
 
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Role</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-
-
-                        <tbody>
-
-                            {{ range .Users }}
-
-                                <tr>
-
-                                    <!-- Username -->
-
-                                    <td>
-                                        <div class="user-name">
-                                            <strong>
-                                                {{ .Username }}
-                                            </strong>
-
-                                            {{ if eq .ID $.CurrentUser.ID }}
-                                                <span class="status-badge status-pending">
-                                                    Current user
-                                                </span>
-                                            {{ end }}
-                                        </div>
-                                    </td>
-
-
-                                    <!-- Current user -->
+                            <td>
+                                <div class="user-row-name">
+                                    <strong>
+                                        {{ .Username }}
+                                    </strong>
 
                                     {{ if eq .ID $.CurrentUser.ID }}
-
-                                        <td>
-                                            <span class="user-role">
-                                                {{ .Role }}
-                                            </span>
-                                        </td>
-
-                                        <td>
-                                            <span class="status-badge status-ok">
-                                                Active
-                                            </span>
-                                        </td>
-
-                                        <td>
-                                            <span class="muted">
-                                                —
-                                            </span>
-                                        </td>
-
-
-                                    <!-- Other users -->
-
-                                    {{ else }}
-
-                                        <!-- Role -->
-
-                                        <td>
-                                            <select
-                                                class="user-select"
-                                                name="role"
-                                                form="update-user-{{ .ID }}"
-                                                aria-label="Role for {{ .Username }}"
-                                            >
-                                                <option
-                                                    value="viewer"
-                                                    {{ if eq .Role "viewer" }}selected{{ end }}
-                                                >
-                                                    Viewer
-                                                </option>
-
-                                                <option
-                                                    value="admin"
-                                                    {{ if eq .Role "admin" }}selected{{ end }}
-                                                >
-                                                    Admin
-                                                </option>
-                                            </select>
-                                        </td>
-
-
-                                        <!-- Status -->
-
-                                        <td>
-                                            <select
-                                                class="user-select"
-                                                name="disabled"
-                                                form="update-user-{{ .ID }}"
-                                                aria-label="Status for {{ .Username }}"
-                                            >
-                                                <option
-                                                    value="false"
-                                                    {{ if not .Disabled }}selected{{ end }}
-                                                >
-                                                    Active
-                                                </option>
-
-                                                <option
-                                                    value="true"
-                                                    {{ if .Disabled }}selected{{ end }}
-                                                >
-                                                    Disabled
-                                                </option>
-                                            </select>
-                                        </td>
-
-
-                                        <!-- Actions -->
-
-                                        <td>
-                                            <div class="user-actions">
-
-                                                <!-- Save -->
-
-                                                <form
-                                                    id="update-user-{{ .ID }}"
-                                                    method="POST"
-                                                    action="/users/{{ .ID }}"
-                                                >
-                                                    <input
-                                                        type="hidden"
-                                                        name="csrf_token"
-                                                        value="{{ $.CSRFToken }}"
-                                                    >
-
-                                                    <button
-                                                        class="button button-secondary"
-                                                        type="submit"
-                                                    >
-                                                        Save
-                                                    </button>
-                                                </form>
-
-
-                                                <!-- Delete -->
-
-                                                <form
-                                                    method="POST"
-                                                    action="/users/{{ .ID }}/delete"
-                                                >
-                                                    <input
-                                                        type="hidden"
-                                                        name="csrf_token"
-                                                        value="{{ $.CSRFToken }}"
-                                                    >
-
-                                                    <button
-                                                        class="button-danger"
-                                                        type="submit"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </form>
-
-                                            </div>
-                                        </td>
-
+                                    <span class="status-badge status-pending">
+                                        Current user
+                                    </span>
                                     {{ end }}
+                                </div>
+                            </td>
 
-                                </tr>
+                            <!-- Current user -->
 
+                            {{ if eq .ID $.CurrentUser.ID }}
+                            <td>
+                                <span class="user-row-role">
+                                    {{ .Role }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="status-badge status-ok">
+                                    Active
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="user-actions-placeholder">
+                                    —
+                                </span>
+                            </td>
+
+                            <!-- Other users -->
+
+                            {{ else }}
+
+                            <!-- Role -->
+
+                            <td>
+                                <select
+                                        class="user-row-select"
+                                        name="role"
+                                        form="update-user-{{ .ID }}"
+                                        aria-label="Role for {{ .Username }}">
+                                    <option
+                                            value="viewer"
+                                            {{ if eq .Role "viewer" }}selected{{ end }}>
+                                        Viewer
+                                    </option>
+
+                                    <option
+                                            value="admin"
+                                            {{ if eq .Role "admin" }}selected{{ end }}>
+                                        Admin
+                                    </option>
+                                </select>
+                            </td>
+
+                            <!-- Status -->
+
+                            <td>
+                                <select
+                                        class="user-row-select"
+                                        name="disabled"
+                                        form="update-user-{{ .ID }}"
+                                        aria-label="Status for {{ .Username }}">
+                                    <option
+                                            value="false"
+                                            {{ if not .Disabled }}selected{{ end }}>
+                                        Active
+                                    </option>
+
+                                    <option
+                                            value="true"
+                                            {{ if .Disabled }}selected{{ end }}>
+                                        Disabled
+                                    </option>
+                                </select>
+                            </td>
+
+                            <!-- Actions -->
+
+                            <td>
+                                <div class="user-row-actions">
+
+                                    <!-- Save -->
+
+                                    <form
+                                          id="update-user-{{ .ID }}"
+                                          method="POST"
+                                          action="/users/{{ .ID }}">
+                                        <input
+                                               type="hidden"
+                                               name="csrf_token"
+                                               value="{{ $.CSRFToken }}">
+
+                                        <button
+                                                class="button button-secondary"
+                                                type="submit">
+                                            Save
+                                        </button>
+                                    </form>
+
+                                    <!-- Delete -->
+
+                                    <form
+                                          method="POST"
+                                          action="/users/{{ .ID }}/delete">
+                                        <input
+                                               type="hidden"
+                                               name="csrf_token"
+                                               value="{{ $.CSRFToken }}">
+
+                                        <button
+                                                class="button-danger"
+                                                type="submit">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
                             {{ end }}
-
-                        </tbody>
-
-                    </table>
-
-                </div>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
 
             {{ else }}
-
-                <div class="empty-state">
-                    <h3>No users</h3>
-                    <p>No users are configured.</p>
-                </div>
-
+            <div class="empty-state">
+                <h3>No users</h3>
+                <p>No users are configured.</p>
+            </div>
             {{ end }}
-
         </section>
-
 
         <!-- Create user -->
 
-        <section class="create-user-section">
-
-            <div class="section-heading">
+        <section class="user-create-section">
+            <div class="section-header">
                 <div>
                     <h2>Create user</h2>
                     <p>Add an administrator or read-only viewer.</p>
                 </div>
             </div>
 
-
             <form
-                class="create-user-form"
-                method="POST"
-                action="/users"
-            >
+                  class="user-create-form"
+                  method="POST"
+                  action="/users">
                 <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="{{ .CSRFToken }}"
-                >
-
+                       type="hidden"
+                       name="csrf_token"
+                       value="{{ .CSRFToken }}">
 
                 <!-- Username -->
 
@@ -302,14 +258,12 @@
                     </label>
 
                     <input
-                        type="text"
-                        id="username"
-                        name="username"
-                        autocomplete="off"
-                        required
-                    >
+                           type="text"
+                           id="username"
+                           name="username"
+                           autocomplete="off"
+                           required>
                 </div>
-
 
                 <!-- Password -->
 
@@ -319,14 +273,12 @@
                     </label>
 
                     <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        autocomplete="new-password"
-                        required
-                    >
+                           type="password"
+                           id="password"
+                           name="password"
+                           autocomplete="new-password"
+                           required>
                 </div>
-
 
                 <!-- Role -->
 
@@ -336,10 +288,9 @@
                     </label>
 
                     <select
-                        id="role"
-                        name="role"
-                        required
-                    >
+                            id="role"
+                            name="role"
+                            required>
                         <option value="viewer">
                             Viewer
                         </option>
@@ -350,16 +301,12 @@
                     </select>
                 </div>
 
-
                 <button
-                    class="button-primary"
-                    type="submit"
-                >
+                        class="button-primary"
+                        type="submit">
                     Create user
                 </button>
-
             </form>
-
         </section>
 
     </main>

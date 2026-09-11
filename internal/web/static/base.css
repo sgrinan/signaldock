@@ -1,0 +1,118 @@
+/* Theme */
+
+:root {
+    color-scheme: dark;
+
+    --bg: #0b0f14;
+    --surface: #111820;
+    --surface-hover: #16202a;
+
+    --border: #263241;
+    --border-strong: #344354;
+
+    --text: #e6edf3;
+    --text-muted: #8b98a5;
+
+    --accent: #79c0ff;
+
+    --success: #7ee787;
+    --warning: #d29922;
+    --danger: #ff7b72;
+
+    --radius: 4px;
+
+    --content-width: 1100px;
+}
+
+
+/* Document */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    min-height: 100%;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+
+    background: var(--bg);
+    color: var(--text);
+
+    font-family:
+        "Cascadia Code",
+        "JetBrains Mono",
+        "SFMono-Regular",
+        Consolas,
+        "Liberation Mono",
+        monospace;
+
+    line-height: 1.5;
+}
+
+a {
+    color: inherit;
+}
+
+button,
+input,
+select {
+    font: inherit;
+}
+
+h1,
+h2,
+h3,
+p {
+    margin-top: 0;
+}
+
+h1 {
+    margin-bottom: 8px;
+
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+h2 {
+    margin-bottom: 0;
+
+    font-size: 1rem;
+    font-weight: 700;
+
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+p {
+    color: var(--text-muted);
+}
+
+
+/* Focus */
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+
+/* Layout */
+
+.container {
+    width: min(var(--content-width),
+            calc(100% - 32px));
+
+    margin: 0 auto;
+}
+
+main {
+    padding-top: 40px;
+    padding-bottom: 64px;
+}

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -7,7 +8,10 @@
 
     <title>SignalDock</title>
 
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/base.css">
+    <link rel="stylesheet" href="/static/components.css">
+    <link rel="stylesheet" href="/static/endpoints.css">
+
     <script src="/static/time.js" defer></script>
 </head>
 
@@ -17,33 +21,30 @@
 
     <header class="site-header">
         <div class="container">
-            <a class="brand" href="/">SignalDock</a>
+            <a class="site-brand" href="/">SignalDock</a>
 
-            <div class="header-actions">
-                <span class="header-label">
+            <div class="site-header-actions">
+                <span class="site-header-label">
                     {{ .CurrentUser.Username }} · {{ .CurrentUser.Role }}
                 </span>
 
                 {{ if eq .CurrentUser.Role "admin" }}
-                    <a
-                        class="button button-secondary"
-                        href="/users"
-                    >
-                        Users
-                    </a>
+                <a
+                   class="button button-secondary"
+                   href="/users">
+                    Users
+                </a>
                 {{ end }}
 
                 <form method="POST" action="/logout">
                     <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="{{ .CSRFToken }}"
-                    >
+                           type="hidden"
+                           name="csrf_token"
+                           value="{{ .CSRFToken }}">
 
                     <button
-                        class="button button-secondary"
-                        type="submit"
-                    >
+                            class="button button-secondary"
+                            type="submit">
                         Sign out
                     </button>
                 </form>
@@ -51,226 +52,185 @@
         </div>
     </header>
 
-
     <!-- Main content -->
 
     <main class="container">
 
         <!-- Endpoint heading and creation -->
 
-        <section class="add-endpoint">
-
-            <div class="section-heading">
+        <section class="endpoint-create-section">
+            <div class="section-header">
                 <div>
                     <h1>Endpoints</h1>
-
                     <p>
                         Monitor HTTP availability, latency and TLS certificates.
                     </p>
                 </div>
             </div>
 
-
             <!-- Admin controls -->
 
             {{ if eq .CurrentUser.Role "admin" }}
+            <form
+                  class="endpoint-create-form"
+                  method="POST"
+                  action="/endpoints">
+                <input
+                       type="hidden"
+                       name="csrf_token"
+                       value="{{ .CSRFToken }}">
 
-                <form
-                    class="add-form"
-                    method="POST"
-                    action="/endpoints"
-                >
-                    <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="{{ .CSRFToken }}"
-                    >
+                <div class="form-field">
+                    <label for="url">
+                        Endpoint URL
+                    </label>
 
-                    <div class="form-field">
-                        <label for="url">
-                            Endpoint URL
-                        </label>
+                    <div class="endpoint-create-row">
+                        <input
+                               type="url"
+                               id="url"
+                               name="url"
+                               placeholder="https://www.example.com"
+                               required>
 
-                        <div class="form-row">
-                            <input
-                                type="url"
-                                id="url"
-                                name="url"
-                                placeholder="https://www.example.com"
-                                required
-                            >
-
-                            <button type="submit">
-                                Add endpoint
-                            </button>
-                        </div>
+                        <button type="submit">
+                            Add endpoint
+                        </button>
                     </div>
-                </form>
+                </div>
+            </form>
 
+            <!-- Alert -->
 
-                <!-- Alert -->
+            {{ if .Error }}
+            <div class="alert" role="alert">
+                <span>
+                    {{ .Error }}
+                </span>
 
-                {{ if .Error }}
-
-                    <div class="alert" role="alert">
-                        <span>
-                            {{ .Error }}
-                        </span>
-
-                        <a
-                            class="alert-close"
-                            href="/"
-                            aria-label="Dismiss notification"
-                        >
-                            &times;
-                        </a>
-                    </div>
-
-                {{ end }}
-
+                <a
+                   class="alert-close"
+                   href="/"
+                   aria-label="Dismiss notification">
+                    &times;
+                </a>
+            </div>
             {{ end }}
-
+            {{ end }}
         </section>
-
 
         <!-- Endpoint list -->
 
         <section class="endpoint-list">
-
-            <div class="section-heading">
+            <div class="section-header">
                 <h2>Monitored endpoints</h2>
 
-                <span class="endpoint-count">
+                <span class="section-count">
                     {{ len .Endpoints }}
                 </span>
             </div>
 
-
             <!-- Endpoint cards -->
 
             {{ if .Endpoints }}
+            <div class="endpoint-grid">
+                {{ range .Endpoints }}
+                <article class="endpoint-card">
 
-                <div class="endpoint-grid">
+                    <!-- Card header -->
 
-                    {{ range .Endpoints }}
+                    <div class="endpoint-card-header">
+                        <a
+                           class="endpoint-card-url"
+                           href="/endpoints/{{ .ID }}">
+                            {{ .URL }}
+                        </a>
 
-                        <article class="endpoint-card">
+                        <span class="status-badge {{ .StateClass }}">
+                            {{ .State }}
+                        </span>
+                    </div>
 
-                            <!-- Card header -->
+                    <!-- Endpoint summary -->
 
-                            <div class="endpoint-card-header">
-                                <a
-                                    class="endpoint-url"
-                                    href="/endpoints/{{ .ID }}"
-                                >
-                                    {{ .URL }}
-                                </a>
+                    <div class="endpoint-card-summary">
+                        <span class="endpoint-card-summary-item">
+                            <span class="endpoint-card-summary-label">
+                                HTTP
+                            </span>
 
-                                <span class="status-badge {{ .StateClass }}">
-                                    {{ .State }}
-                                </span>
-                            </div>
+                            <strong>
+                                {{ .HTTPStatus }}
+                            </strong>
+                        </span>
 
+                        <span class="endpoint-card-summary-item">
+                            <span class="endpoint-card-summary-label">
+                                Latency
+                            </span>
 
-                            <!-- Endpoint summary -->
+                            <strong>
+                                {{ .Latency }}
+                            </strong>
+                        </span>
 
-                            <div class="endpoint-summary">
+                        <span class="endpoint-card-summary-item">
+                            <span class="endpoint-card-summary-label">
+                                TLS
+                            </span>
 
-                                <span class="summary-item">
-                                    <span class="summary-label">
-                                        HTTP
-                                    </span>
+                            <strong>
+                                {{ .TLSState }}
+                            </strong>
+                        </span>
 
-                                    <strong>
-                                        {{ .HTTPStatus }}
-                                    </strong>
-                                </span>
+                        <span class="endpoint-card-summary-item">
+                            <span class="endpoint-card-summary-label">
+                                Last checked
+                            </span>
 
+                            {{ if .LastCheckedAt.IsZero }}
+                            <strong>
+                                Not checked yet
+                            </strong>
+                            {{ else }}
+                            <strong>
+                                <time
+                                      data-local-time
+                                      datetime="{{ .LastCheckedAt.Format "2006-01-02T15:04:05Z07:00" }}">
+                                    {{ .LastCheckedAt.Format "15:04:05" }}
+                                </time>
+                            </strong>
+                            {{ end }}
+                        </span>
 
-                                <span class="summary-item">
-                                    <span class="summary-label">
-                                        Latency
-                                    </span>
-
-                                    <strong>
-                                        {{ .Latency }}
-                                    </strong>
-                                </span>
-
-
-                                <span class="summary-item">
-                                    <span class="summary-label">
-                                        TLS
-                                    </span>
-
-                                    <strong>
-                                        {{ .TLSState }}
-                                    </strong>
-                                </span>
-
-
-                                <span class="summary-item">
-                                    <span class="summary-label">
-                                        Last checked
-                                    </span>
-
-                                    {{ if .LastCheckedAt.IsZero }}
-
-                                        <strong>
-                                            Not checked yet
-                                        </strong>
-
-                                    {{ else }}
-
-                                        <strong>
-                                            <time
-                                                data-local-time
-                                                datetime="{{ .LastCheckedAt.Format "2006-01-02T15:04:05Z07:00" }}"
-                                            >
-                                                {{ .LastCheckedAt.Format "15:04:05" }}
-                                            </time>
-                                        </strong>
-
-                                    {{ end }}
-                                </span>
-
-
-                                <a
-                                    class="button button-secondary"
-                                    href="/endpoints/{{ .ID }}"
-                                >
-                                    View
-                                </a>
-
-                            </div>
-
-                        </article>
-
-                    {{ end }}
-
-                </div>
-
+                        <a
+                           class="button button-secondary"
+                           href="/endpoints/{{ .ID }}">
+                            View
+                        </a>
+                    </div>
+                </article>
+                {{ end }}
+            </div>
 
             <!-- Empty state -->
 
             {{ else }}
+            <div class="empty-state">
+                <h3>No endpoints yet</h3>
 
-                <div class="empty-state">
-                    <h3>No endpoints yet</h3>
-
-                    {{ if eq .CurrentUser.Role "admin" }}
-                        <p>
-                            Add your first endpoint to start monitoring it.
-                        </p>
-                    {{ else }}
-                        <p>
-                            No endpoints are currently being monitored.
-                        </p>
-                    {{ end }}
-                </div>
-
+                {{ if eq .CurrentUser.Role "admin" }}
+                <p>
+                    Add your first endpoint to start monitoring it.
+                </p>
+                {{ else }}
+                <p>
+                    No endpoints are currently being monitored.
+                </p>
+                {{ end }}
+            </div>
             {{ end }}
-
         </section>
 
     </main>
