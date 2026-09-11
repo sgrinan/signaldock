@@ -148,37 +148,18 @@ func (r *Repository) ByID(ctx context.Context, id uuid.UUID) (User, error) {
 	return user, nil
 }
 
-// SetDisabled updates whether a user account is disabled.
-func (r *Repository) SetDisabled(ctx context.Context, id uuid.UUID, disabled bool) error {
+// UpdateAccess updates whether a user account is disabled.
+func (r *Repository) UpdateAccess(ctx context.Context, id uuid.UUID, role Role, disabled bool) error {
 	const query = `
 		UPDATE users
-		SET disabled = $2
+		SET role = $2,
+			disabled = $3
 		WHERE id = $1
 	`
 
-	result, err := r.pool.Exec(ctx, query, id, disabled)
+	result, err := r.pool.Exec(ctx, query, id, role, disabled)
 	if err != nil {
-		return fmt.Errorf("update user: %w", err)
-	}
-
-	if result.RowsAffected() == 0 {
-		return ErrUserNotFound
-	}
-
-	return nil
-}
-
-// SetRole updates the authorization role of a user.
-func (r *Repository) SetRole(ctx context.Context, id uuid.UUID, role Role) error {
-	const query = `
-		UPDATE users
-		SET role = $2
-		WHERE id = $1
-	`
-
-	result, err := r.pool.Exec(ctx, query, id, role)
-	if err != nil {
-		return fmt.Errorf("update user role: %w", err)
+		return fmt.Errorf("update user access: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {

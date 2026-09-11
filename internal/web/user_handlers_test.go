@@ -378,27 +378,24 @@ func TestHandler_HandleUpdateUser(t *testing.T) {
 		currentID := uuid.NewV7()
 		targetID := uuid.NewV7()
 
-		var (
-			gotRole     user.Role
-			gotDisabled bool
-		)
+		called := false
 
 		h.users = &fakeUserRepository{
-			setRoleFunc: func(ctx context.Context, id uuid.UUID, role user.Role) error {
-				if got, want := id, targetID; got != want {
-					t.Errorf("SetRole() id = %v, want %v", got, want)
+			updateAccessFunc: func(_ context.Context, gotID uuid.UUID, gotRole user.Role, gotDisabled bool) error {
+				called = true
+
+				if got, want := gotID, targetID; got != want {
+					t.Errorf("UpdateAccess() id = %v, want %v", got, want)
 				}
 
-				gotRole = role
-				return nil
-			},
-
-			setDisabledFunc: func(ctx context.Context, id uuid.UUID, disabled bool) error {
-				if got, want := id, targetID; got != want {
-					t.Errorf("SetDisabled() id = %v, want %v", got, want)
+				if got, want := gotRole, user.RoleAdmin; got != want {
+					t.Errorf("UpdateAccess() role = %q, want %q", got, want)
 				}
 
-				gotDisabled = disabled
+				if got, want := gotDisabled, true; got != want {
+					t.Errorf("UpdateAccess() disabled = %t, want %t", got, want)
+				}
+
 				return nil
 			},
 		}
@@ -427,12 +424,8 @@ func TestHandler_HandleUpdateUser(t *testing.T) {
 			t.Errorf("handleUpdateUser() Location = %q, want %q", got, want)
 		}
 
-		if got, want := gotRole, user.RoleAdmin; got != want {
-			t.Errorf("SetRole() role = %q, want %q", got, want)
-		}
-
-		if got, want := gotDisabled, true; got != want {
-			t.Errorf("SetDisabled() disabled = %t, want %t", got, want)
+		if !called {
+			t.Error("handleUpdateUser() did not update user access")
 		}
 	})
 
@@ -444,13 +437,9 @@ func TestHandler_HandleUpdateUser(t *testing.T) {
 		called := false
 
 		h.users = &fakeUserRepository{
-			setRoleFunc: func(context.Context, uuid.UUID, user.Role) error {
+			updateAccessFunc: func(context.Context, uuid.UUID, user.Role, bool) error {
 				called = true
-				return nil
-			},
 
-			setDisabledFunc: func(context.Context, uuid.UUID, bool) error {
-				called = true
 				return nil
 			},
 		}
@@ -536,7 +525,7 @@ func TestHandler_HandleUpdateUser(t *testing.T) {
 		targetID := uuid.NewV7()
 
 		h.users = &fakeUserRepository{
-			setRoleFunc: func(context.Context, uuid.UUID, user.Role) error {
+			updateAccessFunc: func(context.Context, uuid.UUID, user.Role, bool) error {
 				return user.ErrUserNotFound
 			},
 		}

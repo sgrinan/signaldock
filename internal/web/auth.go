@@ -21,8 +21,7 @@ type userRepository interface {
 	List(context.Context) ([]user.User, error)
 	ByUsername(context.Context, string) (user.User, error)
 	ByID(context.Context, uuid.UUID) (user.User, error)
-	SetDisabled(context.Context, uuid.UUID, bool) error
-	SetRole(context.Context, uuid.UUID, user.Role) error
+	UpdateAccess(context.Context, uuid.UUID, user.Role, bool) error
 	RemoveByID(context.Context, uuid.UUID) error
 }
 

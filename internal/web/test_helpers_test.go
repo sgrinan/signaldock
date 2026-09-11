@@ -69,13 +69,12 @@ func (f *fakeEndpointService) Refresh(ctx context.Context, id uuid.UUID) (endpoi
 }
 
 type fakeUserRepository struct {
-	insertFunc      func(context.Context, user.User) error
-	listFunc        func(context.Context) ([]user.User, error)
-	byUsernameFunc  func(context.Context, string) (user.User, error)
-	byIDFunc        func(context.Context, uuid.UUID) (user.User, error)
-	setDisabledFunc func(context.Context, uuid.UUID, bool) error
-	setRoleFunc     func(context.Context, uuid.UUID, user.Role) error
-	removeByIDFunc  func(context.Context, uuid.UUID) error
+	insertFunc       func(context.Context, user.User) error
+	listFunc         func(context.Context) ([]user.User, error)
+	byUsernameFunc   func(context.Context, string) (user.User, error)
+	byIDFunc         func(context.Context, uuid.UUID) (user.User, error)
+	updateAccessFunc func(context.Context, uuid.UUID, user.Role, bool) error
+	removeByIDFunc   func(context.Context, uuid.UUID) error
 }
 
 func (f *fakeUserRepository) Insert(ctx context.Context, account user.User) error {
@@ -110,17 +109,9 @@ func (f *fakeUserRepository) ByID(ctx context.Context, id uuid.UUID) (user.User,
 	return user.User{}, user.ErrUserNotFound
 }
 
-func (f *fakeUserRepository) SetDisabled(ctx context.Context, id uuid.UUID, disabled bool) error {
-	if f.setDisabledFunc != nil {
-		return f.setDisabledFunc(ctx, id, disabled)
-	}
-
-	return nil
-}
-
-func (f *fakeUserRepository) SetRole(ctx context.Context, id uuid.UUID, role user.Role) error {
-	if f.setRoleFunc != nil {
-		return f.setRoleFunc(ctx, id, role)
+func (f *fakeUserRepository) UpdateAccess(ctx context.Context, id uuid.UUID, role user.Role, disabled bool) error {
+	if f.updateAccessFunc != nil {
+		return f.updateAccessFunc(ctx, id, role, disabled)
 	}
 
 	return nil

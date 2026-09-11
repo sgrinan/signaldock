@@ -196,19 +196,14 @@ func (h *handler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	disabled := r.FormValue("disabled") == "true"
 
-	if err := h.users.SetRole(r.Context(), id, role); err != nil {
+	if err := h.users.UpdateAccess(r.Context(), id, role, disabled); err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
 
-		h.logger.Error("failed to update user role", "user_id", id, "error", err)
-		http.Error(w, "failed to update user", http.StatusInternalServerError)
-		return
-	}
+		h.logger.Error("failed to update user access", "user_id", id, "error", err)
 
-	if err := h.users.SetDisabled(r.Context(), id, disabled); err != nil {
-		h.logger.Error("failed to update user status", "user_id", id, "error", err)
 		http.Error(w, "failed to update user", http.StatusInternalServerError)
 		return
 	}
