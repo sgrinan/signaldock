@@ -3,44 +3,44 @@ package session
 import "testing"
 
 func TestGenerateToken(t *testing.T) {
-	token := GenerateToken()
+	token := generateToken()
 
 	if token == "" {
-		t.Error("GenerateToken() = empty string, want non-empty token")
+		t.Error("generateToken() = empty string, want non-empty token")
 	}
 }
 
 func TestGenerateTokenUnique(t *testing.T) {
-	first := GenerateToken()
-	second := GenerateToken()
+	first := generateToken()
+	second := generateToken()
 
 	if first == second {
-		t.Errorf("GenerateToken() returned identical tokens, want different tokens")
+		t.Errorf("generateToken() returned identical tokens, want different tokens")
 	}
 }
 
 func TestHashToken(t *testing.T) {
 	token := "test-token"
 
-	first := HashToken(token)
-	second := HashToken(token)
+	first := hashToken(token)
+	second := hashToken(token)
 
 	if first != second {
-		t.Errorf("HashToken(%q) = %q and %q, want identical hashes", token, first, second)
+		t.Errorf("hashToken(%q) = %q and %q, want identical hashes", token, first, second)
 	}
 
 	if first == "" {
-		t.Errorf("HashToken(%q) = empty string, want non-empty hash", token)
+		t.Errorf("hashToken(%q) = empty string, want non-empty hash", token)
 	}
 }
 
 func TestHashTokenDifferentTokens(t *testing.T) {
-	first := HashToken("first-token")
-	second := HashToken("second-token")
+	first := hashToken("first-token")
+	second := hashToken("second-token")
 
 	if first == second {
 		t.Errorf(
-			"HashToken() returned identical hashes for different tokens, want different hashes",
+			"hashToken() returned identical hashes for different tokens, want different hashes",
 		)
 	}
 }

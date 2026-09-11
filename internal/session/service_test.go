@@ -34,8 +34,8 @@ func TestService_Create(t *testing.T) {
 		t.Fatal("Create() token = empty string, want non-empty token")
 	}
 
-	if inserted.TokenHash != HashToken(token) {
-		t.Errorf("inserted TokenHash = %q, want %q", inserted.TokenHash, HashToken(token))
+	if inserted.TokenHash != hashToken(token) {
+		t.Errorf("inserted TokenHash = %q, want %q", inserted.TokenHash, hashToken(token))
 	}
 
 	if inserted.UserID != userID {
@@ -50,10 +50,10 @@ func TestService_Create(t *testing.T) {
 func TestService_Validate(t *testing.T) {
 	ctx := t.Context()
 
-	token := GenerateToken()
+	token := generateToken()
 
 	want := Session{
-		TokenHash: HashToken(token),
+		TokenHash: hashToken(token),
 		UserID:    uuid.NewV7(),
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
@@ -83,8 +83,8 @@ func TestService_Validate(t *testing.T) {
 func TestService_ValidateExpired(t *testing.T) {
 	ctx := t.Context()
 
-	token := GenerateToken()
-	tokenHash := HashToken(token)
+	token := generateToken()
+	tokenHash := hashToken(token)
 
 	session := Session{
 		TokenHash: tokenHash,
@@ -144,8 +144,8 @@ func TestService_ValidateRepositoryError(t *testing.T) {
 func TestService_Delete(t *testing.T) {
 	ctx := t.Context()
 
-	token := GenerateToken()
-	wantHash := HashToken(token)
+	token := generateToken()
+	wantHash := hashToken(token)
 
 	repository := &fakeSessionRepository{
 		deleteFunc: func(ctx context.Context, tokenHash string) error {

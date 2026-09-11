@@ -31,8 +31,8 @@ func NewService(repository sessionRepository) *Service {
 
 // Create creates a session for userID and returns the raw session token.
 func (s *Service) Create(ctx context.Context, userID uuid.UUID) (string, error) {
-	token := GenerateToken()
-	hash := HashToken(token)
+	token := generateToken()
+	hash := hashToken(token)
 
 	session := Session{
 		TokenHash: hash,
@@ -50,7 +50,7 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID) (string, error) 
 // Validate returns the session associated with token.
 // Expired sessions are deleted and reported as ErrSessionExpired.
 func (s *Service) Validate(ctx context.Context, token string) (Session, error) {
-	hash := HashToken(token)
+	hash := hashToken(token)
 
 	session, err := s.repository.ByTokenHash(ctx, hash)
 	if err != nil {
@@ -71,7 +71,7 @@ func (s *Service) Validate(ctx context.Context, token string) (Session, error) {
 // Delete removes the session associated with token.
 // Deleting an already missing session succeeds.
 func (s *Service) Delete(ctx context.Context, token string) error {
-	hash := HashToken(token)
+	hash := hashToken(token)
 
 	if err := s.repository.Delete(ctx, hash); err != nil {
 		if errors.Is(err, ErrSessionNotFound) {
