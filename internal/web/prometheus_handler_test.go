@@ -78,7 +78,7 @@ func TestHandler_HandlePrometheusTargets(t *testing.T) {
 			var got []prometheusTargetGroup
 
 			if err := json.Unmarshal(recorder.Body.Bytes(), &got); err != nil {
-				t.Fatalf("json.Unmarshal() error = %v", err)
+				t.Fatalf("json.Unmarshal() error = %v, want nil", err)
 			}
 
 			if !reflect.DeepEqual(got, tt.want) {

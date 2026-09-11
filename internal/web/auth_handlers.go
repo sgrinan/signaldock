@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	authservice "github.com/sgrinan/signaldock/internal/auth"
+	"github.com/sgrinan/signaldock/internal/auth"
 	"github.com/sgrinan/signaldock/internal/user"
 )
 
@@ -46,7 +46,7 @@ func (h *handler) handlePostLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	valid, err := authservice.VerifyPassword(password, account.PasswordHash)
+	valid, err := auth.VerifyPassword(password, account.PasswordHash)
 	if err != nil {
 		h.logger.Error("failed to verify password", "user_id", account.ID, "error", err)
 

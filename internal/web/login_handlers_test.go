@@ -186,7 +186,7 @@ func TestHandler_HandlePostLoginInvalidCredentials(t *testing.T) {
 	}
 }
 
-func TestHandler_HandlePostLoginUserStoreError(t *testing.T) {
+func TestHandler_HandlePostLoginUserRepositoryError(t *testing.T) {
 	h := newTestHandler(&fakeEndpointService{})
 
 	h.users = &fakeUserRepository{

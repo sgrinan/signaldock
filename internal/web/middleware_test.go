@@ -260,7 +260,7 @@ func TestHandler_RequireAuthSessionError(t *testing.T) {
 	}
 }
 
-func TestHandler_RequireAuthUserStoreError(t *testing.T) {
+func TestHandler_RequireAuthUserRepositoryError(t *testing.T) {
 	userID := uuid.NewV7()
 
 	h := newTestHandler(&fakeEndpointService{})

@@ -12,7 +12,7 @@ import (
 func TestGenerateCSRFToken(t *testing.T) {
 	token, err := generateCSRFToken()
 	if err != nil {
-		t.Fatalf("generateCSRFToken() returned unexpected error: %v", err)
+		t.Fatalf("generateCSRFToken() error = %v, want nil", err)
 	}
 
 	if got, want := len(token), 64; got != want {
@@ -20,7 +20,7 @@ func TestGenerateCSRFToken(t *testing.T) {
 	}
 
 	if _, err := hex.DecodeString(token); err != nil {
-		t.Error("generateCSRFToken() returned non-hexadecimal token")
+		t.Errorf("hex.DecodeString() error = %v, want nil", err)
 	}
 }
 
@@ -31,11 +31,11 @@ func TestGetCSRFToken(t *testing.T) {
 
 		token, err := getCSRFToken(recorder, req)
 		if err != nil {
-			t.Fatalf("getCSRFToken() returned unexpected error: %v", err)
+			t.Fatalf("getCSRFToken() error = %v, want nil", err)
 		}
 
-		if token == "" {
-			t.Fatal("getCSRFToken() token is empty")
+		if got, want := token == "", false; got != want {
+			t.Fatalf("getCSRFToken() token empty = %t, want %t", got, want)
 		}
 
 		cookies := recorder.Result().Cookies()
@@ -83,7 +83,7 @@ func TestGetCSRFToken(t *testing.T) {
 
 		got, err := getCSRFToken(recorder, req)
 		if err != nil {
-			t.Fatalf("getCSRFToken() returned unexpected error: %v", err)
+			t.Fatalf("getCSRFToken() error = %v, want nil", err)
 		}
 
 		if got != token {
@@ -101,7 +101,7 @@ func TestGetCSRFToken(t *testing.T) {
 
 		_, err := getCSRFToken(recorder, req)
 		if err != nil {
-			t.Fatalf("getCSRFToken() returned unexpected error: %v", err)
+			t.Fatalf("getCSRFToken() error = %v, want nil", err)
 		}
 
 		cookies := recorder.Result().Cookies()
