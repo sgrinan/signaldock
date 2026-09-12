@@ -264,44 +264,57 @@
                     <h2>Monitoring</h2>
 
                     <p>
-                        Historical metrics will appear here.
+                        Historical availability, latency, HTTP, and TLS metrics.
                     </p>
                 </div>
+
+                {{ if eq .CurrentUser.Role "admin" }}
+                <a
+                   class="button button-secondary"
+                   href="/grafana/d/signaldock-overview/signaldock-overview?var-endpoint={{ .Endpoint.URL | urlquery }}"
+                   target="_blank"
+                   rel="noopener noreferrer">
+                    Open in Grafana
+                </a>
+                {{ end }}
             </div>
 
-            <div class="endpoint-monitoring-placeholder">
-                Prometheus / Grafana integration
-            </div>
-        </section>
+            <iframe
+                    class="endpoint-monitoring-frame"
+                    src="/grafana/d/signaldock-overview/signaldock-overview?var-endpoint={{ .Endpoint.URL | urlquery }}&kiosk"
+                    title="Grafana monitoring dashboard"
+                    loading="lazy"
+                    scrolling="no">
+            </iframe>
 
-        <!-- Admin danger zone -->
+            <!-- Admin danger zone -->
 
-        {{ if eq .CurrentUser.Role "admin" }}
-        <section class="endpoint-danger-zone">
-            <div>
-                <h2>Danger zone</h2>
+            {{ if eq .CurrentUser.Role "admin" }}
+            <section class="endpoint-danger-zone">
+                <div>
+                    <h2>Danger zone</h2>
 
-                <p>
-                    Remove this endpoint from SignalDock.
-                </p>
-            </div>
+                    <p>
+                        Remove this endpoint from SignalDock.
+                    </p>
+                </div>
 
-            <form
-                  method="POST"
-                  action="/endpoints/{{ .Endpoint.ID }}/delete">
-                <input
-                       type="hidden"
-                       name="csrf_token"
-                       value="{{ .CSRFToken }}">
+                <form
+                      method="POST"
+                      action="/endpoints/{{ .Endpoint.ID }}/delete">
+                    <input
+                           type="hidden"
+                           name="csrf_token"
+                           value="{{ .CSRFToken }}">
 
-                <button
-                        class="button-danger"
-                        type="submit">
-                    Remove endpoint
-                </button>
-            </form>
-        </section>
-        {{ end }}
+                    <button
+                            class="button-danger"
+                            type="submit">
+                        Remove endpoint
+                    </button>
+                </form>
+            </section>
+            {{ end }}
 
     </main>
 

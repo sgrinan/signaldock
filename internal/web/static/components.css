@@ -44,6 +44,7 @@
 
 .site-brand::before {
     content: "> ";
+
     color: var(--success);
 }
 
@@ -110,6 +111,7 @@ button,
 button:hover,
 .button:hover {
     border-color: var(--accent);
+
     color: var(--accent);
 }
 
@@ -134,6 +136,7 @@ button:hover,
 
 .button-danger:hover {
     border-color: var(--danger);
+
     color: var(--danger);
 }
 
@@ -153,7 +156,6 @@ button:hover,
     border-left: 3px solid var(--warning);
 
     background: var(--surface);
-
     color: var(--text);
 }
 
@@ -211,7 +213,6 @@ button:hover,
 
 .empty-state {
     margin-top: 16px;
-
     padding: 48px 24px;
 
     border: 1px dashed var(--border);
@@ -245,13 +246,4 @@ button:hover,
 
 .back-link:hover {
     color: var(--accent);
-}
-
-
-/* Responsive */
-
-@media (max-width: 700px) {
-    .site-header-label {
-        display: none;
-    }
 }

@@ -5,6 +5,7 @@
 }
 
 .endpoint-create-form {
+    max-width: 1100px;
     margin-top: 24px;
 }
 
@@ -47,8 +48,9 @@
 
 .endpoint-grid {
     display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 
-    gap: 10px;
+    gap: 16px;
 
     margin-top: 16px;
 }
@@ -57,6 +59,8 @@
 /* Endpoint card */
 
 .endpoint-card {
+    min-width: 0;
+
     padding: 16px;
 
     border: 1px solid var(--border);
@@ -82,6 +86,8 @@
 }
 
 .endpoint-card-url {
+    min-width: 0;
+
     font-weight: 700;
 
     text-decoration: none;
@@ -96,6 +102,7 @@
 .endpoint-card-summary {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
 
     gap: 24px;
 
@@ -247,15 +254,16 @@
     margin-bottom: 0;
 }
 
-.endpoint-monitoring-placeholder {
-    padding: 32px 20px;
+.endpoint-monitoring-frame {
+    display: block;
 
-    border: 1px dashed var(--border);
+    width: 100%;
+    height: 1840px;
+
+    border: 1px solid var(--border);
     border-radius: var(--radius);
 
-    color: var(--text-muted);
-
-    text-align: center;
+    background: var(--surface);
 }
 
 
@@ -286,67 +294,10 @@
 }
 
 
-/* Responsive */
+/* Desktop responsive */
 
-@media (max-width: 700px) {
-    .endpoint-create-row {
-        flex-direction: column;
-    }
-
-    .endpoint-card-header {
-        align-items: flex-start;
-    }
-
-    .endpoint-card-summary {
-        align-items: flex-start;
-        flex-direction: column;
-
-        gap: 8px;
-    }
-
-    .endpoint-card-summary .button {
-        margin-left: 0;
-        margin-top: 6px;
-    }
-
-    .endpoint-detail-header {
-        flex-direction: column;
-    }
-
-    .endpoint-detail-title-row {
-        align-items: flex-start;
-        flex-direction: column;
-
-        gap: 8px;
-    }
-
-    .endpoint-detail-header form,
-    .endpoint-detail-header button {
-        width: 100%;
-    }
-
-    .endpoint-detail-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .endpoint-detail-row {
-        align-items: flex-start;
-        flex-direction: column;
-
-        gap: 4px;
-    }
-
-    .endpoint-detail-value {
-        text-align: left;
-    }
-
-    .endpoint-danger-zone {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .endpoint-danger-zone form,
-    .endpoint-danger-zone button {
-        width: 100%;
+@media (max-width: 1919px) {
+    .endpoint-monitoring-frame {
+        height: 2000px;
     }
 }

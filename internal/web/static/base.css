@@ -21,7 +21,8 @@
 
     --radius: 4px;
 
-    --content-width: 1100px;
+    --content-width: 1180px;
+    --page-inline-space: 48px;
 }
 
 
@@ -36,8 +37,8 @@ html {
 }
 
 body {
-    margin: 0;
     min-height: 100vh;
+    margin: 0;
 
     background: var(--bg);
     color: var(--text);
@@ -106,8 +107,10 @@ select:focus-visible {
 /* Layout */
 
 .container {
-    width: min(var(--content-width),
-            calc(100% - 32px));
+    width: min(
+        var(--content-width),
+        calc(100% - var(--page-inline-space))
+    );
 
     margin: 0 auto;
 }
@@ -115,4 +118,37 @@ select:focus-visible {
 main {
     padding-top: 40px;
     padding-bottom: 64px;
+}
+
+
+/* Desktop responsive */
+
+@media (min-width: 1440px) {
+    :root {
+        --content-width: 1280px;
+    }
+}
+
+@media (min-width: 1600px) {
+    :root {
+        --content-width: 1440px;
+    }
+}
+
+@media (min-width: 1920px) {
+    :root {
+        --content-width: 1680px;
+    }
+}
+
+@media (min-width: 2560px) {
+    :root {
+        --content-width: 2240px;
+    }
+}
+
+@media (min-width: 3840px) {
+    :root {
+        --content-width: 3360px;
+    }
 }

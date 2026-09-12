@@ -958,7 +958,7 @@
                 "kind": "AutoGridLayout",
                 "spec": {
                   "maxColumnCount": 4,
-                  "columnWidthMode": "standard",
+                  "columnWidthMode": "narrow",
                   "rowHeightMode": "standard",
                   "items": [
                     {
