@@ -34,7 +34,7 @@ type handler struct {
 }
 
 // NewHandler returns the HTTP handler for the SignalDock web interface.
-func NewHandler(endpoints endpointService, users userRepository, sessions sessionService, logger *slog.Logger) (http.Handler, error) {
+func NewHandler(endpoints endpointService, users userRepository, sessions sessionService, grafanaURL string, logger *slog.Logger) (http.Handler, error) {
 	tmpl, err := template.ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
@@ -43,6 +43,11 @@ func NewHandler(endpoints endpointService, users userRepository, sessions sessio
 	staticFS, err := fs.Sub(assets, "static")
 	if err != nil {
 		return nil, fmt.Errorf("create static filesystem: %w", err)
+	}
+
+	grafanaProxy, err := newGrafanaProxy(grafanaURL, logger)
+	if err != nil {
+		return nil, err
 	}
 
 	h := &handler{
@@ -74,5 +79,11 @@ func NewHandler(endpoints endpointService, users userRepository, sessions sessio
 
 	mux.HandleFunc("GET /api/prometheus/targets", h.handlePrometheusTargets)
 
-	return securityHeaders(mux), nil
+	rootMux := http.NewServeMux()
+
+	rootMux.Handle("/grafana/", h.requireAuth(grafanaProxy))
+
+	rootMux.Handle("/", securityHeaders(mux))
+
+	return rootMux, nil
 }

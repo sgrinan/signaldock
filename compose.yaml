@@ -8,6 +8,7 @@ services:
       SIGNALDOCK_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       SIGNALDOCK_ADMIN_USERNAME: ${SIGNALDOCK_ADMIN_USERNAME}
       SIGNALDOCK_ADMIN_PASSWORD: ${SIGNALDOCK_ADMIN_PASSWORD}
+      SIGNALDOCK_GRAFANA_URL: http://grafana:3000
     ports:
       - "8080:8080"
     depends_on:
@@ -47,12 +48,17 @@ services:
 
   grafana:
     image: grafana/grafana:13.2.1
+    environment:
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_VIEWERS_CAN_EDIT: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL}
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
-    ports:
-      - "3000:3000"
     depends_on:
       - prometheus
 

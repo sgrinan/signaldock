@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	defaultPort     = "8080"
-	shutdownTimeout = 10 * time.Second
+	defaultPort       = "8080"
+	defaultGrafanaURL = "http://localhost:3000"
+	shutdownTimeout   = 10 * time.Second
 )
 
 func run(logger *slog.Logger) error {
@@ -36,6 +37,11 @@ func run(logger *slog.Logger) error {
 	port := os.Getenv("SIGNALDOCK_PORT")
 	if port == "" {
 		port = defaultPort
+	}
+
+	grafanaURL := os.Getenv("SIGNALDOCK_GRAFANA_URL")
+	if grafanaURL == "" {
+		grafanaURL = defaultGrafanaURL
 	}
 
 	databaseURL := os.Getenv("SIGNALDOCK_DATABASE_URL")
@@ -72,7 +78,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	handler, err := web.NewHandler(endpointService, userRepository, sessionService, logger)
+	handler, err := web.NewHandler(endpointService, userRepository, sessionService, grafanaURL, logger)
 	if err != nil {
 		return fmt.Errorf("create HTTP handler: %w", err)
 	}
