@@ -77,6 +77,8 @@ func NewHandler(endpoints endpointService, users userRepository, sessions sessio
 	mux.Handle("POST /users/{id}/delete", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleDeleteUser))))
 	mux.Handle("POST /users/{id}", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleUpdateUser))))
 
+	mux.HandleFunc("GET /healthz", handleHealth)
+
 	mux.HandleFunc("GET /api/prometheus/targets", h.handlePrometheusTargets)
 
 	rootMux := http.NewServeMux()

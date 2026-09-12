@@ -1,16 +1,20 @@
 BINARY := bin/signaldock
+
 PACKAGE := ./cmd/signaldock
+
 IMAGE := signaldock
 
 VERSION ?= dev
+
 COMMIT ?= $(shell git rev-parse --short HEAD)
 
 LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 
 TEST_COMPOSE := docker compose -f compose.test.yaml
+
 TEST_DATABASE_URL := postgres://signaldock:test@localhost:5433/signaldock_test?sslmode=disable
 
-.PHONY: build run test check clean docker-build docker-run up down
+.PHONY: build run test check clean docker-build up down
 
 build:
 	mkdir -p bin
@@ -34,10 +38,10 @@ clean:
 	rm -rf bin
 
 docker-build:
-	docker build --build-arg VERSION="$(VERSION)" --build-arg COMMIT="$(COMMIT)" -t "$(IMAGE):$(VERSION)" .
-
-docker-run:
-	docker run --rm -p 8080:8080 "$(IMAGE):$(VERSION)"
+	docker build 
+		--build-arg VERSION="$(VERSION)" \
+		--build-arg COMMIT="$(COMMIT)" \
+		-t "$(IMAGE):$(VERSION)" .
 
 up:
 	docker compose up -d --build

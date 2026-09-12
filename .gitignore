@@ -19,6 +19,7 @@ go.work.sum
 # Local environment and secrets
 .env
 .env.*
+!.env.example
 secrets/
 
 # Editor
