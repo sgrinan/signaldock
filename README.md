@@ -50,7 +50,7 @@ curl -f -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/healthz
 A healthy instance returns:
 
 ```text
-HTTP 200
+200
 ```
 
 ## Stop the stack

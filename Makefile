@@ -38,7 +38,7 @@ clean:
 	rm -rf bin
 
 docker-build:
-	docker build 
+	docker build \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg COMMIT="$(COMMIT)" \
 		-t "$(IMAGE):$(VERSION)" .
