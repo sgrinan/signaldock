@@ -155,6 +155,14 @@ func (f *fakeSessionService) Delete(ctx context.Context, token string) error {
 	return nil
 }
 
+type fakeReadinessChecker struct {
+	pingFunc func(context.Context) error
+}
+
+func (f *fakeReadinessChecker) Ping(ctx context.Context) error {
+	return f.pingFunc(ctx)
+}
+
 func newTestHandler(service endpointService) *handler {
 	tmpl := template.Must(
 		template.New("index.html").Parse(

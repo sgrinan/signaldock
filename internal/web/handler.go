@@ -25,16 +25,21 @@ type endpointService interface {
 	Refresh(context.Context, uuid.UUID) (endpoint.CheckResult, error)
 }
 
+type readinessChecker interface {
+	Ping(context.Context) error
+}
+
 type handler struct {
 	endpoints endpointService
 	users     userRepository
 	sessions  sessionService
+	readiness readinessChecker
 	templates *template.Template
 	logger    *slog.Logger
 }
 
 // NewHandler returns the HTTP handler for the SignalDock web interface.
-func NewHandler(endpoints endpointService, users userRepository, sessions sessionService, grafanaURL string, logger *slog.Logger) (http.Handler, error) {
+func NewHandler(endpoints endpointService, users userRepository, sessions sessionService, readiness readinessChecker, grafanaURL string, logger *slog.Logger) (http.Handler, error) {
 	tmpl, err := template.ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
@@ -54,6 +59,7 @@ func NewHandler(endpoints endpointService, users userRepository, sessions sessio
 		endpoints: endpoints,
 		users:     users,
 		sessions:  sessions,
+		readiness: readiness,
 		templates: tmpl,
 		logger:    logger,
 	}
@@ -78,6 +84,7 @@ func NewHandler(endpoints endpointService, users userRepository, sessions sessio
 	mux.Handle("POST /users/{id}", h.requireAuth(h.requireAdmin(http.HandlerFunc(h.handleUpdateUser))))
 
 	mux.HandleFunc("GET /healthz", handleHealth)
+	mux.HandleFunc("GET /readyz", h.handleReady)
 
 	mux.HandleFunc("GET /api/prometheus/targets", h.handlePrometheusTargets)
 

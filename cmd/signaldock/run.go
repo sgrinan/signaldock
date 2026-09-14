@@ -78,7 +78,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	handler, err := web.NewHandler(endpointService, userRepository, sessionService, grafanaURL, logger)
+	handler, err := web.NewHandler(endpointService, userRepository, sessionService, pool, grafanaURL, logger)
 	if err != nil {
 		return fmt.Errorf("create HTTP handler: %w", err)
 	}
