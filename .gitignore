@@ -22,9 +22,5 @@ go.work.sum
 !.env.example
 secrets/
 
-# Kubernetes environment and secrets
-deploy/kubernetes/**/secret.yaml
-deploy/helm/signaldock/values.secrets.yaml
-
 # Editor
 .vscode/

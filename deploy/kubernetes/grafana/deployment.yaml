@@ -3,6 +3,7 @@ kind: Deployment
 
 metadata:
   name: grafana
+  namespace: signaldock
 
 spec:
   replicas: 1

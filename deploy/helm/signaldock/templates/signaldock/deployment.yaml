@@ -15,7 +15,6 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/signaldock/configmap.yaml") . | sha256sum }}
-        checksum/secret: {{ .Values.secrets.signaldock | toJson | sha256sum }}
 
       labels:
         app: signaldock

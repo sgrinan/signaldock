@@ -56,29 +56,11 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v5
 
-      - name: Create CI secret values
-        run: |
-          cat > /tmp/values.secrets.yaml <<'EOF'
-          secrets:
-            signaldock:
-              adminUsername: ci-admin
-              adminPassword: ci-password
-            postgres:
-              database: signaldock
-              username: signaldock
-              password: ci-password
-          EOF
-
       - name: Lint Helm chart
-        run: |
-          helm lint deploy/helm/signaldock \
-            -f /tmp/values.secrets.yaml
+        run: helm lint deploy/helm/signaldock
 
       - name: Render Helm chart
-        run: |
-          helm template signaldock deploy/helm/signaldock \
-            -f /tmp/values.secrets.yaml \
-            > /tmp/signaldock.yaml
+        run: helm template signaldock deploy/helm/signaldock > /tmp/signaldock.yaml
 
       - name: Create kind cluster
         uses: helm/kind-action@v1
@@ -89,16 +71,10 @@ jobs:
           kubectl apply -f deploy/kubernetes/namespace.yaml
 
       - name: Validate Helm manifests
-        run: |
-          kubectl apply --dry-run=server \
-            -n signaldock-ci \
-            -f /tmp/signaldock.yaml
+        run: kubectl apply --dry-run=server -n signaldock-ci -f /tmp/signaldock.yaml
 
       - name: Validate raw Kubernetes manifests
-        run: |
-          kubectl apply --dry-run=server \
-            --recursive \
-            -f deploy/kubernetes
+        run: kubectl apply --dry-run=server --recursive -f deploy/kubernetes
   
   publish:
     needs:

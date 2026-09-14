@@ -11,8 +11,12 @@ LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 TEST_COMPOSE := docker compose -f compose.test.yaml
 TEST_DATABASE_URL := postgres://signaldock:test@localhost:5433/signaldock_test?sslmode=disable
 
+HELM_RELEASE := signaldock
+HELM_NAMESPACE := signaldock
+HELM_CHART := deploy/helm/signaldock
 
-.PHONY: build run test check ci fmt fmt-check vet clean docker-build up down
+
+.PHONY: build run test check ci fmt fmt-check vet clean docker-build up down helm-up helm-down helm-status
 
 
 build:
@@ -66,3 +70,15 @@ up:
 
 down:
 	docker compose down
+
+
+helm-up:
+	helm upgrade --install "$(HELM_RELEASE)" "$(HELM_CHART)" --namespace "$(HELM_NAMESPACE)" --create-namespace
+
+
+helm-down:
+	helm uninstall "$(HELM_RELEASE)" --namespace "$(HELM_NAMESPACE)"
+
+
+helm-status:
+	helm status "$(HELM_RELEASE)" --namespace "$(HELM_NAMESPACE)"

@@ -3,6 +3,7 @@ kind: Deployment
 
 metadata:
   name: alertmanager
+  namespace: signaldock
 
 spec:
   replicas: 1

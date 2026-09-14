@@ -2,8 +2,8 @@ signaldock:
   replicaCount: 1
 
   image:
-    repository: "signaldock"
-    tag: "dev"
+    repository: "ghcr.io/sgrinan/signaldock"
+    tag: "c38e8489939854b73868fdd5078201631c1ff693"
     pullPolicy: "IfNotPresent"
 
   service:
@@ -80,14 +80,3 @@ grafana:
     viewersCanEdit: false
     rootURL: "http://localhost:8080/grafana/"
     serveFromSubPath: true
-
-
-secrets:
-  signaldock:
-    adminUsername: ""
-    adminPassword: ""
-
-  postgres:
-    database: ""
-    username: ""
-    password: ""

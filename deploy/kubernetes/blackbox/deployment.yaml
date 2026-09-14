@@ -3,6 +3,7 @@ kind: Deployment
 
 metadata:
   name: blackbox
+  namespace: signaldock
 
 spec:
   replicas: 1
