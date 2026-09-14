@@ -13,10 +13,7 @@ spec:
       app: postgres
 
   template:
-    metadata:
-      annotations:
-        checksum/secret: {{ .Values.secrets.postgres | toJson | sha256sum }}
-        
+    metadata:        
       labels:
         app: postgres
 
@@ -61,4 +58,4 @@ spec:
 
         resources:
           requests:
-            storage: {{ .Values.postgres.storage.storageClass }}
+            storage: {{ .Values.postgres.storage.size }}
