@@ -6,7 +6,7 @@ metadata:
 
 spec:
   serviceName: postgres-headless
-  replicas: {{ .Values.postgres.replicaCount }}
+  replicas: 1
 
   selector:
     matchLabels:
@@ -14,6 +14,9 @@ spec:
 
   template:
     metadata:
+      annotations:
+        checksum/secret: {{ .Values.secrets.postgres | toJson | sha256sum }}
+        
       labels:
         app: postgres
 
@@ -25,7 +28,7 @@ spec:
 
           ports:
             - name: postgres
-              containerPort: {{ .Values.postgres.service.port }}
+              containerPort: 5432
 
           envFrom:
             - secretRef:
@@ -42,7 +45,7 @@ spec:
 
           volumeMounts:
             - name: postgres-data
-              mountPath: {{ .Values.postgres.config.mountPath }}
+              mountPath: /var/lib/postgresql
 
   volumeClaimTemplates:
     - metadata:
@@ -52,7 +55,9 @@ spec:
         accessModes:
           - ReadWriteOnce
 
-        storageClassName: {{ .Values.postgres.storage.size }}
+        {{- if .Values.postgres.storage.storageClass }}
+        storageClassName: {{ .Values.postgres.storage.storageClass | quote }}
+        {{- end }}
 
         resources:
           requests:

@@ -2,115 +2,92 @@ signaldock:
   replicaCount: 1
 
   image:
-    repository: signaldock
-    tag: dev
-    pullPolicy: IfNotPresent
+    repository: "signaldock"
+    tag: "dev"
+    pullPolicy: "IfNotPresent"
 
   service:
     port: 8080
 
-  config:
-    port: "8080"
-    grafanaURL: "http://grafana:3000"
-
-  secret:
-    name: signaldock
-
 
 postgres:
-  replicaCount: 1
-
   image:
-    repository: postgres
+    repository: "postgres"
     tag: "18.6"
-    pullPolicy: IfNotPresent
+    pullPolicy: "IfNotPresent"
 
   service:
     port: 5432
-    headlessName: postgres-headless
-  
-  config:
-    mountPath: /var/lib/postgresql
 
   storage:
-    size: 1Gi
-    storageClass: standard
-
-  secret:
-    name: postgres
+    size: "1Gi"
+    storageClass: ""
 
 
 blackbox:
   replicaCount: 1
 
   image:
-    repository: quay.io/prometheus/blackbox-exporter
-    tag: v0.28.0
-    pullPolicy: IfNotPresent
+    repository: "quay.io/prometheus/blackbox-exporter"
+    tag: "v0.28.0"
+    pullPolicy: "IfNotPresent"
 
   service:
     port: 9115
 
-  config:
-    file: /config/blackbox.yml
-
 
 prometheus:
-  replicaCount: 1
-
   image:
-    repository: prom/prometheus
-    tag: v3.14.0
-    pullPolicy: IfNotPresent
+    repository: "prom/prometheus"
+    tag: "v3.14.0"
+    pullPolicy: "IfNotPresent"
 
   service:
     port: 9090
 
   storage:
-    size: 2Gi
-    storageClass: standard
-
-  config:
-    file: /etc/prometheus/prometheus.yml
-    rules: /etc/prometheus/rules
-
-  dataPath: /prometheus
+    size: "2Gi"
+    storageClass: ""
 
 
 alertmanager:
-  replicaCount: 1
-
   image:
-    repository: prom/alertmanager
-    tag: v0.34.0
-    pullPolicy: IfNotPresent
+    repository: "prom/alertmanager"
+    tag: "v0.34.0"
+    pullPolicy: "IfNotPresent"
 
   service:
     port: 9093
 
-  config:
-    file: /etc/alertmanager/alertmanager.yml
-
 
 grafana:
-  replicaCount: 1
-
   image:
-    repository: grafana/grafana
-    tag: 13.2.1
-    pullPolicy: IfNotPresent
+    repository: "grafana/grafana"
+    tag: "13.2.1"
+    pullPolicy: "IfNotPresent"
 
   service:
     port: 3000
 
   storage:
-    size: 1Gi
-    storageClass: standard
+    size: "1Gi"
+    storageClass: ""
 
   config:
-    allowEmbedding: "true"
-    anonymousEnabled: "true"
-    anonymousOrgRole: Viewer
-    viewersCanEdit: "false"
+    allowEmbedding: true
+    anonymousEnabled: true
+    anonymousOrgRole: "Viewer"
+    viewersCanEdit: false
     rootURL: "http://localhost:8080/grafana/"
-    serveFromSubPath: "true"
+    serveFromSubPath: true
+
+
+secrets:
+  signaldock:
+    adminUsername: ""
+    adminPassword: ""
+
+  postgres:
+    database: ""
+    username: ""
+    password: ""

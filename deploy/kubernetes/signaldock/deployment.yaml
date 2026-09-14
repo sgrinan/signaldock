@@ -3,6 +3,7 @@ kind: Deployment
 
 metadata:
   name: signaldock
+  namespace: signaldock
 
 spec:
   replicas: 1

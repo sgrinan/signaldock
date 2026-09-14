@@ -5,7 +5,10 @@ metadata:
   name: prometheus
 
 spec:
-  replicas: {{ .Values.prometheus.replicaCount }}
+  replicas: 1
+
+  strategy:
+    type: Recreate
 
   selector:
     matchLabels:
@@ -13,6 +16,10 @@ spec:
 
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/prometheus/configmap.yaml") . | sha256sum }}
+        checksum/rules: {{ include (print $.Template.BasePath "/prometheus/rules-configmap.yaml") . | sha256sum }}
+
       labels:
         app: prometheus
 
@@ -23,12 +30,12 @@ spec:
           imagePullPolicy: {{ .Values.prometheus.image.pullPolicy }}
 
           args:
-            - "--config.file={{ .Values.prometheus.config.file }}"
-            - "--storage.tsdb.path={{ .Values.prometheus.dataPath }}"
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
 
           ports:
             - name: http
-              containerPort: {{ .Values.prometheus.service.port }}
+              containerPort: 9090
 
           readinessProbe:
             httpGet:
@@ -46,16 +53,16 @@ spec:
 
           volumeMounts:
             - name: config
-              mountPath: {{ .Values.prometheus.config.file }}
+              mountPath: /etc/prometheus/prometheus.yml
               subPath: prometheus.yml
               readOnly: true
 
             - name: rules
-              mountPath: {{ .Values.prometheus.config.rules }}
+              mountPath: /etc/prometheus/rules
               readOnly: true
 
             - name: data
-              mountPath: {{ .Values.prometheus.dataPath }}
+              mountPath: /prometheus
 
       volumes:
         - name: config

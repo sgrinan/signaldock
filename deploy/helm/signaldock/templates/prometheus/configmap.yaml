@@ -8,7 +8,7 @@ data:
       scrape_interval: 5s
 
     rule_files:
-      - {{ .Values.prometheus.config.rules }}/*.yml
+      - /etc/prometheus/rules/*.yml
 
     alerting:
       alertmanagers:

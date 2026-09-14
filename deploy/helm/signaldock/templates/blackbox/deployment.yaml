@@ -13,6 +13,9 @@ spec:
 
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/blackbox/configmap.yaml") . | sha256sum }}
+      
       labels:
         app: blackbox
 
@@ -23,15 +26,15 @@ spec:
           imagePullPolicy: {{ .Values.blackbox.image.pullPolicy }}
 
           args:
-            - "--config.file={{ .Values.blackbox.config.file }}"
+            - --config.file=/config/blackbox.yml
 
           ports:
             - name: http
-              containerPort: {{ .Values.blackbox.service.port }}
+              containerPort: 9115
 
           volumeMounts:
             - name: config
-              mountPath: {{ .Values.blackbox.config.file }}
+              mountPath: /config/blackbox.yml
               subPath: blackbox.yml
               readOnly: true
               

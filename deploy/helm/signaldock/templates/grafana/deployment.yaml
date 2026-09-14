@@ -5,7 +5,10 @@ metadata:
   name: grafana
 
 spec:
-  replicas: {{ .Values.grafana.replicaCount }}
+  replicas: 1
+
+  strategy:
+    type: Recreate
 
   selector:
     matchLabels:
@@ -13,6 +16,11 @@ spec:
 
   template:
     metadata:
+      annotations:
+        checksum/datasources: {{ include (print $.Template.BasePath "/grafana/datasources-configmap.yaml") . | sha256sum }}
+        checksum/provisioning: {{ include (print $.Template.BasePath "/grafana/dashboards-configmap.yaml") . | sha256sum }}
+        checksum/dashboards: {{ include (print $.Template.BasePath "/grafana/dashboard-files-configmap.yaml") . | sha256sum }}
+
       labels:
         app: grafana
 
@@ -24,7 +32,7 @@ spec:
 
           ports:
             - name: http
-              containerPort: {{ .Values.grafana.service.port }}
+              containerPort: 3000
 
           env:
             - name: GF_SECURITY_ALLOW_EMBEDDING

@@ -3,5 +3,5 @@ kind: ConfigMap
 metadata:
   name: signaldock
 data:
-  SIGNALDOCK_PORT: {{ .Values.signaldock.config.port | quote }}
-  SIGNALDOCK_GRAFANA_URL: {{ .Values.signaldock.config.grafanaURL | quote }}
+  SIGNALDOCK_PORT: {{ .Values.signaldock.service.port | quote }}
+  SIGNALDOCK_GRAFANA_URL: {{ printf "http://grafana:%v" .Values.grafana.service.port | quote }}

@@ -5,7 +5,7 @@ metadata:
   name: alertmanager
 
 spec:
-  replicas: {{ .Values.alertmanager.replicaCount }}
+  replicas: 1
 
   selector:
     matchLabels:
@@ -23,7 +23,7 @@ spec:
           imagePullPolicy: {{ .Values.alertmanager.image.pullPolicy }}
 
           args:
-            - "--config.file={{ .Values.alertmanager.config.file }}"
+            - --config.file=/etc/alertmanager/alertmanager.yml
 
           ports:
             - name: http
@@ -31,7 +31,7 @@ spec:
 
           volumeMounts:
             - name: config
-              mountPath: {{ .Values.alertmanager.config.file }}
+              mountPath: /etc/alertmanager/alertmanager.yml
               subPath: alertmanager.yml
               readOnly: true
 
