@@ -33,17 +33,8 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Check formatting
-        run: test -z "$(gofmt -l .)"
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Test
-        run: go test -race ./...
-
-      - name: Build
-        run: go build ./...
+      - name: Check
+        run: make ci
 
   docker:
     runs-on: ubuntu-latest
