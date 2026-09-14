@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: alertmanager
+  name: signaldock
 spec:
   selector:
-    app: alertmanager
+    app: signaldock
   ports:
     - name: http
-      port: 9093
+      port: {{ .Values.signaldock.service.port }}
       targetPort: http

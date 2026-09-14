@@ -5,7 +5,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: standard
+  storageClassName: {{ .Values.grafana.storage.storageClass }}
   resources:
     requests:
-      storage: 1Gi
+      storage: {{ .Values.grafana.storage.size }}

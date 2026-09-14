@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: signaldock
+data:
+  SIGNALDOCK_PORT: {{ .Values.signaldock.config.port | quote }}
+  SIGNALDOCK_GRAFANA_URL: {{ .Values.signaldock.config.grafanaURL | quote }}

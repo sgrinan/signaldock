@@ -465,7 +465,7 @@ data:
                           "spec": {
                             "editorMode": "code",
                             "expr": "probe_duration_seconds{job=\"blackbox-http\", signaldock_id!=\"\", instance=\"$endpoint\"}",
-                            "legendFormat": "{{instance}}",
+                            "legendFormat": "{{ "{{instance}}" }}",
                             "range": true
                           },
                           "labels": {
@@ -585,7 +585,7 @@ data:
                             "expr": "probe_success{job=\"blackbox-http\", signaldock_id!=\"\", instance=\"$endpoint\"}",
                             "format": "time_series",
                             "instant": false,
-                            "legendFormat": "{{instance}}",
+                            "legendFormat": "{{ "{{instance}}" }}",
                             "range": true
                           },
                           "labels": {
@@ -695,7 +695,7 @@ data:
                           "spec": {
                             "editorMode": "code",
                             "expr": "probe_http_duration_seconds{job=\"blackbox-http\", signaldock_id!=\"\", instance=\"$endpoint\"}",
-                            "legendFormat": "{{phase}}",
+                            "legendFormat": "{{ "{{phase}}" }}",
                             "range": true
                           },
                           "labels": {
@@ -810,7 +810,7 @@ data:
                           "spec": {
                             "editorMode": "code",
                             "expr": "probe_http_status_code{job=\"blackbox-http\", signaldock_id!=\"\", instance=\"$endpoint\"}",
-                            "legendFormat": "{{instance}}",
+                            "legendFormat": "{{ "{{instance}}" }}",
                             "range": true
                           },
                           "labels": {

@@ -14,5 +14,5 @@ data:
               severity: critical
             annotations:
               summary: "Endpoint is down"
-              description: "{{ $labels.instance }} has been unreachable for more than 1 minute."
+              description: "{{ "{{ $labels.instance }}" }} has been unreachable for more than 1 minute."
 

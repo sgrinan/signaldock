@@ -5,7 +5,7 @@ metadata:
   name: grafana
 
 spec:
-  replicas: 1
+  replicas: {{ .Values.grafana.replicaCount }}
 
   selector:
     matchLabels:
@@ -19,31 +19,31 @@ spec:
     spec:
       containers:
         - name: grafana
-          image: grafana/grafana:13.2.1
-          imagePullPolicy: IfNotPresent
+          image: "{{ .Values.grafana.image.repository }}:{{ .Values.grafana.image.tag }}"
+          imagePullPolicy: {{ .Values.grafana.image.pullPolicy }}
 
           ports:
             - name: http
-              containerPort: 3000
+              containerPort: {{ .Values.grafana.service.port }}
 
           env:
             - name: GF_SECURITY_ALLOW_EMBEDDING
-              value: "true"
+              value: {{ .Values.grafana.config.allowEmbedding | quote }}
 
             - name: GF_AUTH_ANONYMOUS_ENABLED
-              value: "true"
+              value: {{ .Values.grafana.config.anonymousEnabled | quote }}
 
             - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-              value: "Viewer"
+              value: {{ .Values.grafana.config.anonymousOrgRole | quote }}
 
             - name: GF_USERS_VIEWERS_CAN_EDIT
-              value: "false"
+              value: {{ .Values.grafana.config.viewersCanEdit | quote }}
 
             - name: GF_SERVER_ROOT_URL
-              value: "http://localhost:8080/grafana/"
+              value: {{ .Values.grafana.config.rootURL | quote }}
 
             - name: GF_SERVER_SERVE_FROM_SUB_PATH
-              value: "true"
+              value: {{ .Values.grafana.config.serveFromSubPath | quote }}
 
           volumeMounts:
             - name: datasources

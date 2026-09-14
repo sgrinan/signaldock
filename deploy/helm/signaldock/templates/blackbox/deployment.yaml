@@ -5,7 +5,7 @@ metadata:
   name: blackbox
 
 spec:
-  replicas: 1
+  replicas: {{ .Values.blackbox.replicaCount }}
 
   selector:
     matchLabels:
@@ -19,19 +19,19 @@ spec:
     spec:
       containers:
         - name: blackbox
-          image: quay.io/prometheus/blackbox-exporter:v0.28.0
-          imagePullPolicy: IfNotPresent
+          image: "{{ .Values.blackbox.image.repository }}:{{ .Values.blackbox.image.tag }}"
+          imagePullPolicy: {{ .Values.blackbox.image.pullPolicy }}
 
           args:
-            - --config.file=/config/blackbox.yml
+            - "--config.file={{ .Values.blackbox.config.file }}"
 
           ports:
             - name: http
-              containerPort: 9115
+              containerPort: {{ .Values.blackbox.service.port }}
 
           volumeMounts:
             - name: config
-              mountPath: /config/blackbox.yml
+              mountPath: {{ .Values.blackbox.config.file }}
               subPath: blackbox.yml
               readOnly: true
               

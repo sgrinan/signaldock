@@ -5,7 +5,7 @@ metadata:
   name: signaldock
 
 spec:
-  replicas: 1
+  replicas: {{ .Values.signaldock.replicaCount }}
 
   selector:
     matchLabels:
@@ -21,12 +21,12 @@ spec:
 
       containers:
         - name: signaldock
-          image: signaldock:dev
-          imagePullPolicy: IfNotPresent
+          image: {{ .Values.signaldock.image.repository }}:{{ .Values.signaldock.image.tag }}
+          imagePullPolicy: {{ .Values.signaldock.image.pullPolicy }}
 
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: {{ .Values.signaldock.service.port }}
 
           livenessProbe:
             httpGet:

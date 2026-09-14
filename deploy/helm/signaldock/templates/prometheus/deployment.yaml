@@ -5,7 +5,7 @@ metadata:
   name: prometheus
 
 spec:
-  replicas: 1
+  replicas: {{ .Values.prometheus.replicaCount }}
 
   selector:
     matchLabels:
@@ -19,16 +19,16 @@ spec:
     spec:
       containers:
         - name: prometheus
-          image: prom/prometheus:v3.14.0
-          imagePullPolicy: IfNotPresent
+          image: "{{ .Values.prometheus.image.repository }}:{{ .Values.prometheus.image.tag }}"
+          imagePullPolicy: {{ .Values.prometheus.image.pullPolicy }}
 
           args:
-            - --config.file=/etc/prometheus/prometheus.yml
-            - --storage.tsdb.path=/prometheus
+            - "--config.file={{ .Values.prometheus.config.file }}"
+            - "--storage.tsdb.path={{ .Values.prometheus.dataPath }}"
 
           ports:
             - name: http
-              containerPort: 9090
+              containerPort: {{ .Values.prometheus.service.port }}
 
           readinessProbe:
             httpGet:
@@ -46,16 +46,16 @@ spec:
 
           volumeMounts:
             - name: config
-              mountPath: /etc/prometheus/prometheus.yml
+              mountPath: {{ .Values.prometheus.config.file }}
               subPath: prometheus.yml
               readOnly: true
 
             - name: rules
-              mountPath: /etc/prometheus/rules
+              mountPath: {{ .Values.prometheus.config.rules }}
               readOnly: true
 
             - name: data
-              mountPath: /prometheus
+              mountPath: {{ .Values.prometheus.dataPath }}
 
       volumes:
         - name: config

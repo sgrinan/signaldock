@@ -11,6 +11,6 @@ data:
         uid: prometheus
         type: prometheus
         access: proxy
-        url: http://prometheus:9090
+        url: http://prometheus:{{ .Values.prometheus.service.port }}
         isDefault: true
         editable: false

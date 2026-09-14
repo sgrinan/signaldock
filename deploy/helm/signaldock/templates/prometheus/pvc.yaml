@@ -5,7 +5,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: standard
+  storageClassName: {{ .Values.prometheus.storage.storageClass }}
   resources:
     requests:
-      storage: 2Gi
+      storage: {{ .Values.prometheus.storage.size }}
