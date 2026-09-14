@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - "docs/**"
+
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - "docs/**"
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Build
+        run: go build ./...
+
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Build Docker image
+        run: docker build -t signaldock:ci .
+
+  helm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+
+      - name: Create CI secret values
+        run: |
+          cat > /tmp/values.secrets.yaml <<'EOF'
+          secrets:
+            signaldock:
+              adminUsername: ci-admin
+              adminPassword: ci-password
+            postgres:
+              database: signaldock
+              username: signaldock
+              password: ci-password
+          EOF
+
+      - name: Lint Helm chart
+        run: |
+          helm lint deploy/helm/signaldock \
+            -f /tmp/values.secrets.yaml
+
+      - name: Render Helm chart
+        run: |
+          helm template signaldock deploy/helm/signaldock \
+            -f /tmp/values.secrets.yaml \
+            > /tmp/signaldock.yaml
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.14.0
+
+      - name: Create test namespaces
+        run: |
+          kubectl create namespace signaldock-ci
+          kubectl apply -f deploy/kubernetes/namespace.yaml
+
+      - name: Validate Helm manifests
+        run: |
+          kubectl apply --dry-run=server \
+            -n signaldock-ci \
+            -f /tmp/signaldock.yaml
+
+      - name: Validate raw Kubernetes manifests
+        run: |
+          kubectl apply --dry-run=server \
+            --recursive \
+            -f deploy/kubernetes
