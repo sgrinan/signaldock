@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: grafana
+  namespace: signaldock
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: grafana
+
+  template:
+    metadata:
+      labels:
+        app: grafana
+
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:13.2.1
+
+          ports:
+            - name: http
+              containerPort: 3000
+
+          env:
+            - name: GF_SECURITY_ALLOW_EMBEDDING
+              value: "true"
+
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: "Viewer"
+
+            - name: GF_USERS_VIEWERS_CAN_EDIT
+              value: "false"
+
+            - name: GF_SERVER_ROOT_URL
+              value: "http://localhost:8080/grafana/"
+
+            - name: GF_SERVER_SERVE_FROM_SUB_PATH
+              value: "true"
+
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
+
+            - name: provisioning-dashboards
+              mountPath: /etc/grafana/provisioning/dashboards
+              readOnly: true
+
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+              readOnly: true
+
+            - name: data
+              mountPath: /var/lib/grafana
+
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+
+        - name: provisioning-dashboards
+          configMap:
+            name: grafana-provisioning-dashboards
+
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+
+        - name: data
+          persistentVolumeClaim:
+            claimName: grafana-data
