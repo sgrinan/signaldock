@@ -14,6 +14,7 @@ secrets/
 compose.yaml
 compose.test.yaml
 config/
+deploy/
 
 # Tests
 **/*_test.go

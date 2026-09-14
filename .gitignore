@@ -22,5 +22,8 @@ go.work.sum
 !.env.example
 secrets/
 
+# Kubernetes environment and secrets
+deploy/kubernetes/**/secret.yaml
+
 # Editor
 .vscode/

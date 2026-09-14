@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: signaldock
+  namespace: signaldock
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: signaldock
+
+  template:
+    metadata:
+      labels:
+        app: signaldock
+
+    spec:
+      enableServiceLinks: false
+
+      containers:
+        - name: signaldock
+          image: signaldock:dev
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres
+                  key: POSTGRES_DB
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres
+                  key: POSTGRES_USER
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres
+                  key: POSTGRES_PASSWORD
+            
+            - name: SIGNALDOCK_DATABASE_URL
+              value: "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?sslmode=disable"
+
+            - name: SIGNALDOCK_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: signaldock
+                  key: SIGNALDOCK_ADMIN_USERNAME
+
+            - name: SIGNALDOCK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: signaldock
+                  key: SIGNALDOCK_ADMIN_PASSWORD
+
+            - name: SIGNALDOCK_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: signaldock
+                  key: SIGNALDOCK_PORT
+
+            - name: SIGNALDOCK_GRAFANA_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: signaldock
+                  key: SIGNALDOCK_GRAFANA_URL
