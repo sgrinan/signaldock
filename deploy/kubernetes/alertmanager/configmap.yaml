@@ -1,0 +1,12 @@
+apiVersion: v1
+data:
+  alertmanager.yml: |-
+    route:
+      receiver: default
+
+    receivers:
+      - name: default
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: alertmanager-config

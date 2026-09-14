@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: alertmanager
+  namespace: signaldock
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: alertmanager
+
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.34.0
+
+          args:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+
+          ports:
+            - name: http
+              containerPort: 9093
+
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager/alertmanager.yml
+              subPath: alertmanager.yml
+              readOnly: true
+
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
