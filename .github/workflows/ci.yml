@@ -75,14 +75,43 @@ jobs:
 
       - name: Validate raw Kubernetes manifests
         run: kubectl apply --dry-run=server --recursive -f deploy/kubernetes
-  
+
+  image-changes:
+    if: github.event_name == 'push'
+
+    runs-on: ubuntu-latest
+
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check image-related changes
+        id: changes
+        shell: bash
+        run: |
+          if git diff --quiet "${{ github.event.before }}" "${{ github.sha }}" -- \
+            cmd internal go.mod go.sum Dockerfile .dockerignore; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   publish:
     needs:
       - go
       - docker
       - helm
+      - image-changes
 
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.image-changes.outputs.changed == 'true'
 
     runs-on: ubuntu-latest
 
@@ -110,3 +139,6 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          build-args: |
+            VERSION=dev
+            COMMIT=${{ github.sha }}
