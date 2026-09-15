@@ -2,7 +2,7 @@ signaldock:
   replicaCount: 1
   image:
     repository: "ghcr.io/sgrinan/signaldock"
-    tag: "106ab923b0aa983dff2d9104a4abf5e543dbd638"
+    tag: "a0ee336837be84dccf62532b899a1f7cbdc9c929"
     pullPolicy: "IfNotPresent"
   service:
     port: 8080
