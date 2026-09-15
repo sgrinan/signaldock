@@ -2,7 +2,7 @@ signaldock:
   replicaCount: 1
   image:
     repository: "ghcr.io/sgrinan/signaldock"
-    tag: "a0ee336837be84dccf62532b899a1f7cbdc9c929"
+    tag: "83e204f8a6e4ecceb452bc63ca18e686c8ef1c33"
     pullPolicy: "IfNotPresent"
 postgres:
   image:
@@ -44,4 +44,3 @@ grafana:
     anonymousOrgRole: "Viewer"
     viewersCanEdit: false
     rootURL: "http://localhost:8080/grafana/"
-    
