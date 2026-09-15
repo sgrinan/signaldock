@@ -4,10 +4,5 @@ metadata:
   name: blackbox
 data:
   blackbox.yml: |-
-    modules:
-      http_2xx:
-        prober: http
-        timeout: 5s
-        http:
-          preferred_ip_protocol: ip4
+{{ .Files.Get "files/blackbox/blackbox.yml" | indent 4 }}
 

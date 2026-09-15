@@ -4,15 +4,11 @@ signaldock:
     repository: "ghcr.io/sgrinan/signaldock"
     tag: "a0ee336837be84dccf62532b899a1f7cbdc9c929"
     pullPolicy: "IfNotPresent"
-  service:
-    port: 8080
 postgres:
   image:
     repository: "postgres"
     tag: "18.6"
     pullPolicy: "IfNotPresent"
-  service:
-    port: 5432
   storage:
     size: "1Gi"
     storageClass: ""
@@ -22,15 +18,11 @@ blackbox:
     repository: "quay.io/prometheus/blackbox-exporter"
     tag: "v0.28.0"
     pullPolicy: "IfNotPresent"
-  service:
-    port: 9115
 prometheus:
   image:
     repository: "prom/prometheus"
     tag: "v3.14.0"
     pullPolicy: "IfNotPresent"
-  service:
-    port: 9090
   storage:
     size: "2Gi"
     storageClass: ""
@@ -39,22 +31,17 @@ alertmanager:
     repository: "prom/alertmanager"
     tag: "v0.34.0"
     pullPolicy: "IfNotPresent"
-  service:
-    port: 9093
 grafana:
   image:
     repository: "grafana/grafana"
     tag: "13.2.1"
     pullPolicy: "IfNotPresent"
-  service:
-    port: 3000
   storage:
     size: "1Gi"
     storageClass: ""
   config:
-    allowEmbedding: true
     anonymousEnabled: true
     anonymousOrgRole: "Viewer"
     viewersCanEdit: false
     rootURL: "http://localhost:8080/grafana/"
-    serveFromSubPath: true
+    

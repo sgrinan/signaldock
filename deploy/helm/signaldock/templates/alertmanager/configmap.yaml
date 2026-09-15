@@ -4,8 +4,4 @@ metadata:
   name: alertmanager-config
 data:
   alertmanager.yml: |-
-    route:
-      receiver: default
-
-    receivers:
-      - name: default
+{{ .Files.Get "files/alertmanager/alertmanager.yml" | indent 4 }}

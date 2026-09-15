@@ -4,13 +4,5 @@ metadata:
   name: grafana-provisioning-dashboards
 data:
   dashboards.yml: |-
-    apiVersion: 1
-
-    providers:
-      - name: SignalDock
-        folder: SignalDock
-        type: file
-        updateIntervalSeconds: 30
-        options:
-          path: /var/lib/grafana/dashboards
+{{ .Files.Get "files/grafana/provisioning/dashboards/dashboards.yml" | indent 4 }}
 

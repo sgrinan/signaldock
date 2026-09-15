@@ -4,13 +4,4 @@ metadata:
   name: grafana-datasources
 data:
   prometheus.yml: |-
-    apiVersion: 1
-
-    datasources:
-      - name: Prometheus
-        uid: prometheus
-        type: prometheus
-        access: proxy
-        url: http://prometheus:{{ .Values.prometheus.service.port }}
-        isDefault: true
-        editable: false
+{{ .Files.Get "files/grafana/provisioning/datasources/prometheus.yml" | indent 4 }}

@@ -36,7 +36,7 @@ spec:
 
           env:
             - name: GF_SECURITY_ALLOW_EMBEDDING
-              value: {{ .Values.grafana.config.allowEmbedding | quote }}
+              value: "true"
 
             - name: GF_AUTH_ANONYMOUS_ENABLED
               value: {{ .Values.grafana.config.anonymousEnabled | quote }}
@@ -51,7 +51,7 @@ spec:
               value: {{ .Values.grafana.config.rootURL | quote }}
 
             - name: GF_SERVER_SERVE_FROM_SUB_PATH
-              value: {{ .Values.grafana.config.serveFromSubPath | quote }}
+              value: "true"
 
           volumeMounts:
             - name: datasources

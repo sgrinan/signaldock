@@ -4,15 +4,5 @@ metadata:
   name: prometheus-rules
 data:
   signaldock.yml: |-
-    groups:
-      - name: signaldock
-        rules:
-          - alert: EndpointDown
-            expr: probe_success{job="blackbox-http", signaldock_id!=""} == 0
-            for: 1m
-            labels:
-              severity: critical
-            annotations:
-              summary: "Endpoint is down"
-              description: "{{ "{{ $labels.instance }}" }} has been unreachable for more than 1 minute."
+{{ .Files.Get "files/prometheus/rules/signaldock.yml" | indent 4 }}
 

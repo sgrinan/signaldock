@@ -7,5 +7,5 @@ spec:
     app: grafana
   ports:
     - name: http
-      port: {{ .Values.grafana.service.port }}
+      port: 3000
       targetPort: http

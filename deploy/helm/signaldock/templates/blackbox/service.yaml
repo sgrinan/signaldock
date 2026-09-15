@@ -7,5 +7,5 @@ spec:
     app: blackbox
   ports:
     - name: http
-      port: {{ .Values.blackbox.service.port }}
+      port: 9115
       targetPort: http

@@ -39,15 +39,15 @@ services:
     command:
       - --config.file=/config/blackbox.yml
     volumes:
-      - ./config/blackbox/blackbox.yml:/config/blackbox.yml:ro
+      - ./deploy/helm/signaldock/files/blackbox/blackbox.yml:/config/blackbox.yml:ro
 
   prometheus:
     image: prom/prometheus:v3.14.0
     command:
       - --config.file=/etc/prometheus/prometheus.yml
     volumes:
-      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./config/prometheus/rules:/etc/prometheus/rules:ro
+      - ./deploy/helm/signaldock/files/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/helm/signaldock/files/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus-data:/prometheus
     depends_on:
       - blackbox
@@ -63,8 +63,8 @@ services:
       GF_SERVER_ROOT_URL: http://localhost:8080/grafana/
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     volumes:
-      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./deploy/helm/signaldock/files/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/helm/signaldock/files/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
@@ -74,7 +74,7 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
     volumes:
-      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./deploy/helm/signaldock/files/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
 
 volumes:
   postgres-data:
