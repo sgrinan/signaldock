@@ -74,6 +74,11 @@ func run(logger *slog.Logger) error {
 	sessionRepository := session.NewRepository(pool)
 	sessionService := session.NewService(sessionRepository)
 
+	sessionCleanupCtx, stopSessionCleanup := context.WithCancel(ctx)
+	defer stopSessionCleanup()
+
+	go runSessionCleanup(sessionCleanupCtx, sessionRepository, logger)
+
 	if err := refreshEndpointsOnStartup(ctx, endpointService, logger); err != nil {
 		return err
 	}
