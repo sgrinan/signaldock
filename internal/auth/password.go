@@ -18,7 +18,7 @@ const (
 	keyLength          = 32
 )
 
-// HashPassword returns an Argon2id hash of password using a random salt
+// HashPassword returns an Argon2id hash of password using a random salt.
 func HashPassword(password string) string {
 	salt := make([]byte, saltLength)
 	rand.Read(salt)

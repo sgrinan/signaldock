@@ -59,22 +59,54 @@ jobs:
       - name: Lint Helm chart
         run: helm lint deploy/helm/signaldock
 
+      - name: Lint AWS Helm chart
+        run: helm lint deploy/helm/signaldock -f deploy/helm/signaldock/values-aws.yaml
+
       - name: Render Helm chart
         run: helm template signaldock deploy/helm/signaldock > /tmp/signaldock.yaml
+
+      - name: Render AWS Helm chart
+        run: |
+          helm template signaldock deploy/helm/signaldock \
+            -f deploy/helm/signaldock/values-aws.yaml \
+            > /tmp/signaldock-aws.yaml
 
       - name: Create kind cluster
         uses: helm/kind-action@v1
 
-      - name: Create test namespaces
-        run: |
-          kubectl create namespace signaldock-ci
-          kubectl apply -f deploy/kubernetes/namespace.yaml
+      - name: Create test namespace
+        run: kubectl create namespace signaldock-ci
 
       - name: Validate Helm manifests
         run: kubectl apply --dry-run=server -n signaldock-ci -f /tmp/signaldock.yaml
 
-      - name: Validate raw Kubernetes manifests
-        run: kubectl apply --dry-run=server --recursive -f deploy/kubernetes
+      - name: Validate AWS Helm manifests
+        run: kubectl apply --dry-run=server -n signaldock-ci -f /tmp/signaldock-aws.yaml
+
+  terraform:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.16.2
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Initialize Terraform
+        run: terraform init -backend=false
+
+      - name: Validate Terraform
+        run: terraform validate
 
   image-changes:
     if: github.event_name == 'push'
@@ -106,6 +138,7 @@ jobs:
       - go
       - docker
       - helm
+      - terraform
       - image-changes
 
     if: |
