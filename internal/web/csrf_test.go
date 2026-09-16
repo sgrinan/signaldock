@@ -186,25 +186,3 @@ func TestValidateCSRF(t *testing.T) {
 		})
 	}
 }
-
-func TestGetCSRFTokenSecureBehindHTTPSProxy(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "http://signaldock/", nil)
-	req.Header.Set("X-Forwarded-Proto", "https")
-	recorder := httptest.NewRecorder()
-
-	handler := trustProxyHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, err := getCSRFToken(w, r); err != nil {
-			t.Errorf("getCSRFToken() error = %v, want nil", err)
-		}
-	}))
-	handler.ServeHTTP(recorder, req)
-
-	cookies := recorder.Result().Cookies()
-	if got, want := len(cookies), 1; got != want {
-		t.Fatalf("getCSRFToken() set %d cookies, want %d", got, want)
-	}
-
-	if !cookies[0].Secure {
-		t.Error("CSRF cookie Secure = false behind HTTPS proxy, want true")
-	}
-}

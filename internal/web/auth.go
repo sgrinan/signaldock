@@ -43,7 +43,7 @@ func setSessionCookie(w http.ResponseWriter, r *http.Request, token string) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   requestIsSecure(r),
+		Secure:   r.TLS != nil,
 	})
 }
 
@@ -54,7 +54,7 @@ func clearSessionCookie(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   requestIsSecure(r),
+		Secure:   r.TLS != nil,
 		MaxAge:   -1,
 	})
 }

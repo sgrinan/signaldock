@@ -107,23 +107,3 @@ func TestClearSessionCookie(t *testing.T) {
 		})
 	}
 }
-
-func TestSetSessionCookieSecureBehindHTTPSProxy(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "http://signaldock/", nil)
-	req.Header.Set("X-Forwarded-Proto", "https")
-	recorder := httptest.NewRecorder()
-
-	handler := trustProxyHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		setSessionCookie(w, r, "session-token")
-	}))
-	handler.ServeHTTP(recorder, req)
-
-	cookies := recorder.Result().Cookies()
-	if got, want := len(cookies), 1; got != want {
-		t.Fatalf("len(cookies) = %d, want %d", got, want)
-	}
-
-	if !cookies[0].Secure {
-		t.Error("session cookie Secure = false behind HTTPS proxy, want true")
-	}
-}

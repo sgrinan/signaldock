@@ -44,7 +44,7 @@ func getCSRFToken(w http.ResponseWriter, r *http.Request) (string, error) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		Secure:   requestIsSecure(r),
+		Secure:   r.TLS != nil,
 	})
 
 	return token, nil
