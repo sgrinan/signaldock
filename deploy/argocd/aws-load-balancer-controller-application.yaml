@@ -14,6 +14,9 @@ spec:
       releaseName: aws-load-balancer-controller
       values: |
         clusterName: signaldock-lab
+        region: eu-west-1
+        vpcId: vpc-010add1fe6cdcd0e3
+
         serviceAccount:
           create: true
           name: aws-load-balancer-controller
