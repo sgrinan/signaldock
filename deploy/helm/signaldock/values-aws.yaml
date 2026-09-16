@@ -1,0 +1,11 @@
+postgres:
+  storage:
+    storageClass: "gp3"
+
+prometheus:
+  storage:
+    storageClass: "gp3"
+
+grafana:
+  storage:
+    storageClass: "gp3"
