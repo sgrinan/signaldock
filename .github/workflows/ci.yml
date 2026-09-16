@@ -83,6 +83,9 @@ jobs:
       - name: Validate AWS Helm manifests
         run: kubectl apply --dry-run=server -n signaldock-ci -f /tmp/signaldock-aws.yaml
 
+      - name: Validate AWS platform manifests
+        run: kubectl apply --dry-run=server -f deploy/aws/storageclass-gp3.yaml
+
   terraform:
     runs-on: ubuntu-latest
 
