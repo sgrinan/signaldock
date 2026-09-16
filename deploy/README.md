@@ -6,9 +6,30 @@ SignalDock uses three management layers. Keeping their responsibilities separate
 | --- | --- |
 | Terraform | AWS VPC/subnets, EKS cluster and node group, EKS managed add-ons, IAM roles/policies, Pod Identity associations, and AWS Secrets Manager secret containers |
 | Argo CD / GitOps | SignalDock Helm release, ExternalSecret/SecretStore resources, AWS `gp3` StorageClass, and the AWS ImageUpdater custom resource |
-| Manual bootstrap | Initial controller installation, secret values, and the Git credential used by Image Updater |
+| Manual bootstrap | Initial controller installation, secret values, Git credentials, and one root Argo CD Application per cluster |
 
 Secret values and Git credentials are intentionally not stored in Git or Terraform state.
+
+## Argo CD layout
+
+The Argo CD manifests use an App of Apps layout so changes to child Applications are reconciled from Git instead of requiring repeated `kubectl apply` commands.
+
+```text
+deploy/argocd/
+├── bootstrap/
+│   ├── aws-root-application.yaml
+│   └── local-root-application.yaml
+├── aws/
+│   ├── aws-platform-application.yaml
+│   ├── external-secrets-aws-application.yaml
+│   ├── signaldock-aws-application.yaml
+│   └── signaldock-image-updater-aws.yaml
+└── local/
+    ├── external-secrets-application.yaml
+    └── signaldock-application.yaml
+```
+
+Only the root Application is bootstrapped manually. After that, Argo CD manages the child Applications from Git with automated prune and self-heal enabled.
 
 ## AWS bootstrap
 
@@ -84,31 +105,9 @@ signaldock/lab/postgres
 
 Populate them out of band before deploying the application. Do not commit the values or place them in Terraform variables/state.
 
-### 4. Bootstrap GitOps applications
+### 4. Configure Image Updater Git write-back
 
-The platform Application adopts and manages the AWS in-cluster resources under `deploy/aws/`, including the `gp3` StorageClass:
-
-```bash
-kubectl apply -f deploy/argocd/aws-platform-application.yaml
-kubectl apply -f deploy/argocd/external-secrets-aws-application.yaml
-```
-
-Wait for External Secrets to materialize the Kubernetes Secrets:
-
-```bash
-kubectl get externalsecret -n signaldock
-kubectl get secret -n signaldock
-```
-
-Then deploy SignalDock:
-
-```bash
-kubectl apply -f deploy/argocd/signaldock-aws-application.yaml
-```
-
-### 5. Configure Image Updater Git write-back
-
-Create the Git credential directly in the cluster. Never commit this Secret:
+Create the Git credential directly in the cluster before bootstrapping the root Application. Never commit this Secret:
 
 ```bash
 read -s GITHUB_TOKEN
@@ -123,13 +122,24 @@ kubectl create secret generic image-updater-git-creds \
 unset GITHUB_TOKEN
 ```
 
-Apply the ImageUpdater resource:
+Only the AWS Image Updater writes image tags back to `deploy/helm/signaldock/values.yaml`. Local clusters consume those Git changes but do not perform write-back.
+
+### 5. Bootstrap GitOps
+
+Apply the AWS root Application once:
 
 ```bash
-kubectl apply -f deploy/argocd/signaldock-image-updater-aws.yaml
+kubectl apply -f deploy/argocd/bootstrap/aws-root-application.yaml
 ```
 
-Only the AWS Image Updater writes image tags back to `deploy/helm/signaldock/values.yaml`. Local clusters consume those Git changes but do not perform write-back.
+The root Application then manages:
+
+- the AWS platform Application for `deploy/aws/` and the `gp3` StorageClass;
+- the AWS External Secrets Application;
+- the SignalDock Helm Application using `values-aws.yaml`;
+- the AWS ImageUpdater custom resource.
+
+Changes to those child manifests are subsequently reconciled directly from Git.
 
 ### 6. Verify
 
@@ -141,19 +151,27 @@ kubectl get pvc -n signaldock
 kubectl get externalsecret -n signaldock
 ```
 
-The expected final state is `Synced` / `Healthy` for the Argo CD Applications and `Running` for the SignalDock workloads.
+The expected AWS Applications are:
+
+```text
+signaldock-root-aws
+signaldock-aws
+signaldock-platform-aws
+signaldock-secrets-aws
+```
+
+They should settle at `Synced` / `Healthy`, and the SignalDock workloads should be `Running`.
 
 ## Local cluster
 
 The local environment uses the same Helm chart and common `values.yaml`. No local values override is currently needed.
 
-A fresh local cluster still needs the Argo CD and External Secrets Operator controllers installed first. The Image Updater controller is not required locally because AWS is the single Git write-back owner.
+A fresh local cluster needs Argo CD and External Secrets Operator installed first. The Image Updater controller is not required locally because AWS is the single Git write-back owner.
 
-Local External Secrets reads from manually created source Secrets in the `shared-secrets` namespace through the Kubernetes provider. Create those source Secrets out of band, then apply:
+Local External Secrets reads from manually created source Secrets in the `shared-secrets` namespace through the Kubernetes provider. Create those source Secrets out of band, then bootstrap the local App of Apps once:
 
 ```bash
-kubectl apply -f deploy/argocd/external-secrets-application.yaml
-kubectl apply -f deploy/argocd/signaldock-application.yaml
+kubectl apply -f deploy/argocd/bootstrap/local-root-application.yaml
 ```
 
-The local cluster intentionally has no ImageUpdater writer. This prevents local and AWS controllers from competing to commit changes to the same Helm values file.
+The root Application manages the local External Secrets and SignalDock Applications from Git. The local cluster intentionally has no ImageUpdater writer, preventing local and AWS controllers from competing to commit changes to the same Helm values file.
