@@ -18,10 +18,16 @@ spec:
         app: postgres
 
     spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+
       containers:
         - name: postgres
           image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
           imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
+
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
 
           ports:
             - name: postgres

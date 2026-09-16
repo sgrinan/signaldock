@@ -5,7 +5,8 @@ metadata:
   name: signaldock
 
 spec:
-  replicas: {{ .Values.signaldock.replicaCount }}
+  # Endpoint check state is process-local, so SignalDock is intentionally single-replica.
+  replicas: 1
 
   selector:
     matchLabels:
@@ -20,12 +21,26 @@ spec:
         app: signaldock
 
     spec:
+      automountServiceAccountToken: false
       enableServiceLinks: false
 
       containers:
         - name: signaldock
           image: {{ .Values.signaldock.image.repository }}:{{ .Values.signaldock.image.tag }}
           imagePullPolicy: {{ .Values.signaldock.image.pullPolicy }}
+
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            {{- toYaml .Values.signaldock.resources | nindent 12 }}
 
           ports:
             - name: http

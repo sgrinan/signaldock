@@ -1,41 +1,87 @@
 signaldock:
-  replicaCount: 1
   image:
     repository: "ghcr.io/sgrinan/signaldock"
     tag: "d4c31b87bcf3fbc69248e27b94e379f206b0d436"
     pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
 postgres:
   image:
     repository: "postgres"
     tag: "18.6"
     pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
   storage:
     size: "1Gi"
     storageClass: ""
+    
 blackbox:
   replicaCount: 1
   image:
     repository: "quay.io/prometheus/blackbox-exporter"
     tag: "v0.28.0"
     pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
 prometheus:
   image:
     repository: "prom/prometheus"
     tag: "v3.14.0"
     pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "150m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
   storage:
     size: "2Gi"
     storageClass: ""
+
 alertmanager:
   image:
     repository: "prom/alertmanager"
     tag: "v0.34.0"
     pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
 grafana:
   image:
     repository: "grafana/grafana"
     tag: "13.2.1"
     pullPolicy: "IfNotPresent"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
   storage:
     size: "1Gi"
     storageClass: ""

@@ -20,10 +20,28 @@ spec:
         app: blackbox
 
     spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+
       containers:
         - name: blackbox
           image: "{{ .Values.blackbox.image.repository }}:{{ .Values.blackbox.image.tag }}"
           imagePullPolicy: {{ .Values.blackbox.image.pullPolicy }}
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            {{- toYaml .Values.blackbox.resources | nindent 12 }}
 
           args:
             - --config.file=/config/blackbox.yml

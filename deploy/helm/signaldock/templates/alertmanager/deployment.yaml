@@ -20,10 +20,27 @@ spec:
         app: alertmanager
 
     spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+
       containers:
         - name: alertmanager
           image: "{{ .Values.alertmanager.image.repository }}:{{ .Values.alertmanager.image.tag }}"
           imagePullPolicy: {{ .Values.alertmanager.image.pullPolicy }}
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            {{- toYaml .Values.alertmanager.resources | nindent 12 }}
 
           args:
             - --config.file=/etc/alertmanager/alertmanager.yml

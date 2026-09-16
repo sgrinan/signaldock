@@ -25,6 +25,9 @@ spec:
         app: grafana
 
     spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+
       securityContext:
         fsGroup: 472
         fsGroupChangePolicy: OnRootMismatch
@@ -33,6 +36,19 @@ spec:
         - name: grafana
           image: "{{ .Values.grafana.image.repository }}:{{ .Values.grafana.image.tag }}"
           imagePullPolicy: {{ .Values.grafana.image.pullPolicy }}
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 472
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            {{- toYaml .Values.grafana.resources | nindent 12 }}
 
           ports:
             - name: http

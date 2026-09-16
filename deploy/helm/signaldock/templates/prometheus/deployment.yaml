@@ -24,6 +24,9 @@ spec:
         app: prometheus
 
     spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+
       securityContext:
         fsGroup: 65534
         fsGroupChangePolicy: OnRootMismatch
@@ -32,6 +35,21 @@ spec:
         - name: prometheus
           image: "{{ .Values.prometheus.image.repository }}:{{ .Values.prometheus.image.tag }}"
           imagePullPolicy: {{ .Values.prometheus.image.pullPolicy }}
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            {{- toYaml .Values.prometheus.resources | nindent 12 }}
 
           args:
             - --config.file=/etc/prometheus/prometheus.yml
