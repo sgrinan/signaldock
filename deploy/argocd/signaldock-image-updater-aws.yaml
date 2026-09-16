@@ -1,0 +1,24 @@
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: signaldock-aws
+  namespace: argocd
+spec:
+  writeBackConfig:
+    method: "git:secret:image-updater-git-creds"
+    gitConfig:
+      repository: "https://github.com/sgrinan/signaldock.git"
+      branch: "main"
+      writeBackTarget: "helmvalues:/deploy/helm/signaldock/values.yaml"
+  applicationRefs:
+    - namePattern: "signaldock-aws"
+      images:
+        - alias: "signaldock"
+          imageName: "ghcr.io/sgrinan/signaldock"
+          commonUpdateSettings:
+            updateStrategy: "newest-build"
+            allowTags: "regexp:^[0-9a-f]{40}$"
+          manifestTargets:
+            helm:
+              name: "signaldock.image.repository"
+              tag: "signaldock.image.tag"
