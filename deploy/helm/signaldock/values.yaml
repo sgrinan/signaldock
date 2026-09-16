@@ -1,7 +1,7 @@
 signaldock:
   image:
     repository: "ghcr.io/sgrinan/signaldock"
-    tag: "d4c31b87bcf3fbc69248e27b94e379f206b0d436"
+    tag: "aa4abd39e6ed7535dbb867dd89bca83f9d50308b"
     pullPolicy: "IfNotPresent"
   resources:
     requests:
@@ -16,7 +16,6 @@ signaldock:
     className: ""
     host: ""
     annotations: {}
-
 postgres:
   image:
     repository: "postgres"
@@ -32,7 +31,6 @@ postgres:
   storage:
     size: "1Gi"
     storageClass: ""
-    
 blackbox:
   replicaCount: 1
   image:
@@ -46,7 +44,6 @@ blackbox:
     limits:
       cpu: "200m"
       memory: "128Mi"
-
 prometheus:
   image:
     repository: "prom/prometheus"
@@ -62,7 +59,6 @@ prometheus:
   storage:
     size: "2Gi"
     storageClass: ""
-
 alertmanager:
   image:
     repository: "prom/alertmanager"
@@ -75,7 +71,6 @@ alertmanager:
     limits:
       cpu: "200m"
       memory: "128Mi"
-
 grafana:
   image:
     repository: "grafana/grafana"
