@@ -2,7 +2,7 @@ signaldock:
   replicaCount: 1
   image:
     repository: "ghcr.io/sgrinan/signaldock"
-    tag: "72fdf367e976dbc0a40c65b0177e4faeab747400"
+    tag: "d4c31b87bcf3fbc69248e27b94e379f206b0d436"
     pullPolicy: "IfNotPresent"
 postgres:
   image:
