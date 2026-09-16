@@ -84,16 +84,24 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
+`.env` is used only by Docker Compose and is ignored by Git; `.env.example` is the tracked template. Kubernetes/Helm and AWS deployments do not consume this file.
+
 Replace the example passwords in `.env`, then start the stack:
 
 ```bash
-docker compose up -d --build
+make up
 ```
 
 Open:
 
 ```text
 http://localhost:8080
+```
+
+Check the Compose services:
+
+```bash
+make status
 ```
 
 Check application health:
@@ -105,7 +113,7 @@ curl -f http://localhost:8080/healthz
 Stop the stack:
 
 ```bash
-docker compose down
+make down
 ```
 
 PostgreSQL, Prometheus, and Grafana data use persistent Docker volumes. To also remove local data:
@@ -122,6 +130,7 @@ The Makefile provides the main development workflow:
 make build
 make run
 make test
+make check
 make ci
 ```
 
@@ -131,6 +140,12 @@ Build the application image locally with:
 
 ```bash
 make docker-build
+```
+
+Validate the Helm chart locally with:
+
+```bash
+make helm-lint
 ```
 
 ## Kubernetes and AWS
@@ -143,6 +158,16 @@ deploy/helm/signaldock/files/
 
 The same configuration files are consumed by Docker Compose, avoiding separate configuration sources for local and Kubernetes deployments.
 
+For a direct local Helm deployment, the Makefile exposes:
+
+```bash
+make helm-up
+make helm-status
+make helm-down
+```
+
+The required `signaldock` and `postgres` Kubernetes Secrets must already exist when installing the chart directly. The GitOps-based local deployment instead obtains them through External Secrets.
+
 The AWS environment is provisioned with Terraform and includes:
 
 - VPC and public subnets across two Availability Zones
@@ -154,7 +179,34 @@ The AWS environment is provisioned with Terraform and includes:
 
 Kubernetes resources are then reconciled through Argo CD using an App of Apps layout.
 
-See [`deploy/README.md`](deploy/README.md) for the complete local and AWS bootstrap procedure, ownership boundaries, and verification commands.
+The supported AWS workflow is:
+
+```bash
+make aws-up
+
+# Populate the AWS Secrets Manager values created by Terraform.
+
+make aws-bootstrap
+make aws-status
+```
+
+`make aws-up` creates the Secrets Manager containers only. Populate `signaldock/lab/signaldock` and `signaldock/lab/postgres` in AWS Secrets Manager using the required key/value fields documented in [`deploy/README.md`](deploy/README.md). Do not put these AWS secret values in `.env`, Git, or Terraform state.
+
+When the lab is no longer needed:
+
+```bash
+make aws-destroy
+```
+
+`aws-destroy` stops GitOps reconciliation, removes the SignalDock workloads and PVCs, waits for their dynamically provisioned EBS volumes to disappear, and only then runs `terraform destroy`.
+
+The default AWS profile, region, cluster, and kubectl context can be overridden from the command line without editing the repository, for example:
+
+```bash
+make aws-up AWS_PROFILE=my-profile AWS_REGION=eu-west-1
+```
+
+See [`deploy/README.md`](deploy/README.md) for ownership boundaries, the complete AWS bootstrap and teardown flow, local GitOps notes, and verification commands.
 
 ### Private AWS access
 
@@ -189,7 +241,7 @@ deploy/argocd/
     └── signaldock-application.yaml
 ```
 
-Only the root Application is bootstrapped manually. Child Applications are subsequently reconciled from Git with automated prune and self-heal.
+Only the root Application is bootstrapped explicitly. Child Applications are subsequently reconciled from Git with automated prune and self-heal.
 
 AWS is the single Image Updater write-back owner. Local clusters consume the resulting Git changes but do not compete to update `values.yaml`.
 

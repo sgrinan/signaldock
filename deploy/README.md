@@ -6,7 +6,7 @@ SignalDock uses three management layers. Keeping their responsibilities separate
 | --- | --- |
 | Terraform | AWS VPC/subnets, EKS cluster and node group, EKS managed add-ons, IAM roles/policies, Pod Identity associations, and AWS Secrets Manager secret containers |
 | Argo CD / GitOps | SignalDock Helm release, ExternalSecret/SecretStore resources, AWS `gp3` StorageClass, and the AWS ImageUpdater custom resource |
-| Manual bootstrap | Initial controller installation, secret values, Git credentials, and one root Argo CD Application per cluster |
+| Bootstrap / operator input | Initial controller installation, secret values, Git credentials, and one root Argo CD Application per cluster |
 
 Secret values and Git credentials are intentionally not stored in Git or Terraform state.
 
@@ -29,107 +29,174 @@ deploy/argocd/
     └── signaldock-application.yaml
 ```
 
-Only the root Application is bootstrapped manually. After that, Argo CD manages the child Applications from Git with automated prune and self-heal enabled.
+Only the root Application is bootstrapped explicitly. After that, Argo CD manages the child Applications from Git with automated prune and self-heal enabled.
 
-## AWS bootstrap
+## AWS deployment
 
-The versions below are pinned so a new cluster can be reproduced instead of depending on a moving `stable` or `latest` reference.
+The repository Makefile provides the supported workflow for provisioning, bootstrapping, inspecting, and destroying the AWS environment.
 
-```bash
-export ARGO_CD_VERSION=v3.5.3
-export EXTERNAL_SECRETS_VERSION=2.10.0
-export IMAGE_UPDATER_VERSION=v1.2.2
+The main operator-facing targets are:
+
+```text
+make aws-up
+make aws-bootstrap
+make aws-status
+make aws-destroy
 ```
+
+Supporting targets are available for lower-level operations:
+
+```text
+make aws-init
+make aws-plan
+make aws-kubeconfig
+make aws-secrets-status
+```
+
+Argo CD, External Secrets Operator, and Argo CD Image Updater versions are pinned in the Makefile so a fresh cluster does not depend on moving `stable` or `latest` references.
 
 ### 1. Provision AWS infrastructure
 
-Authenticate the AWS CLI, then provision the infrastructure:
+Authenticate the AWS CLI with the configured profile, then run:
 
 ```bash
-cd infra/terraform
+make aws-up
+```
+
+By default, the Makefile uses:
+
+```text
+AWS_PROFILE=signaldock
+AWS_REGION=eu-west-1
+EKS_CLUSTER=signaldock-lab
+EKS_CONTEXT=signaldock-aws
+```
+
+These values can be overridden without editing the repository:
+
+```bash
+make aws-up AWS_PROFILE=my-profile AWS_REGION=eu-west-1
+```
+
+`aws-up` performs the infrastructure phase only:
+
+```text
+AWS credential check
+        ↓
 terraform init
-terraform plan
+        ↓
 terraform apply
+        ↓
+EKS kubeconfig configuration
 ```
 
-Configure kubectl from the Terraform-managed EKS cluster:
+Terraform creates the AWS infrastructure and Secrets Manager secret containers. It deliberately does not manage the secret values.
 
-```bash
-aws eks update-kubeconfig \
-  --region eu-west-1 \
-  --name "$(terraform output -raw eks_cluster_name)"
-```
+### 2. Populate external secret values
 
-### 2. Install bootstrap controllers
-
-Argo CD is the root GitOps controller, so its first installation is intentionally manual:
-
-```bash
-kubectl create namespace argocd
-kubectl apply \
-  --namespace argocd \
-  --server-side \
-  --force-conflicts \
-  -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGO_CD_VERSION}/manifests/install.yaml"
-```
-
-Install External Secrets Operator. Its ServiceAccount name must remain `external-secrets` because the Terraform Pod Identity association targets that namespace and ServiceAccount:
-
-```bash
-helm repo add external-secrets https://charts.external-secrets.io
-helm repo update
-
-helm upgrade --install external-secrets \
-  external-secrets/external-secrets \
-  --namespace external-secrets \
-  --create-namespace \
-  --version "${EXTERNAL_SECRETS_VERSION}"
-```
-
-Install Argo CD Image Updater in the same namespace as Argo CD:
-
-```bash
-kubectl apply \
-  --namespace argocd \
-  -f "https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/${IMAGE_UPDATER_VERSION}/config/install.yaml"
-```
-
-### 3. Populate external secret values
-
-Terraform creates these AWS Secrets Manager containers but deliberately does not manage their values:
+Terraform creates these AWS Secrets Manager containers:
 
 ```text
 signaldock/lab/signaldock
 signaldock/lab/postgres
 ```
 
-Populate them out of band before deploying the application. Do not commit the values or place them in Terraform variables/state.
+Terraform deliberately does not create their current secret values. Populate both secrets directly in AWS Secrets Manager before bootstrapping the workloads.
 
-### 4. Configure Image Updater Git write-back
+The AWS ExternalSecret resources use `dataFrom.extract`, so each Secrets Manager value must contain the expected key/value fields.
 
-Create the Git credential directly in the cluster before bootstrapping the root Application. Never commit this Secret:
+`signaldock/lab/signaldock`:
 
-```bash
-read -s GITHUB_TOKEN
-
-kubectl create secret generic image-updater-git-creds \
-  --namespace argocd \
-  --from-literal=username=sgrinan \
-  --from-literal=password="$GITHUB_TOKEN" \
-  --dry-run=client -o yaml \
-  | kubectl apply -f -
-
-unset GITHUB_TOKEN
+```text
+SIGNALDOCK_ADMIN_USERNAME=<admin-username>
+SIGNALDOCK_ADMIN_PASSWORD=<admin-password>
 ```
 
-Only the AWS Image Updater writes image tags back to `deploy/helm/signaldock/values.yaml`. Local clusters consume those Git changes but do not perform write-back.
+Equivalent JSON value:
 
-### 5. Bootstrap GitOps
+```json
+{
+  "SIGNALDOCK_ADMIN_USERNAME": "<admin-username>",
+  "SIGNALDOCK_ADMIN_PASSWORD": "<admin-password>"
+}
+```
 
-Apply the AWS root Application once:
+`signaldock/lab/postgres`:
+
+```text
+POSTGRES_DB=<database-name>
+POSTGRES_USER=<database-username>
+POSTGRES_PASSWORD=<database-password>
+```
+
+Equivalent JSON value:
+
+```json
+{
+  "POSTGRES_DB": "<database-name>",
+  "POSTGRES_USER": "<database-username>",
+  "POSTGRES_PASSWORD": "<database-password>"
+}
+```
+
+Do not commit these values or place them in `.env`, Terraform variables, or Terraform state. The root `.env` file is only for the Docker Compose environment and is not used by AWS or Kubernetes.
+
+Their availability can be checked without printing their contents:
 
 ```bash
-kubectl apply -f deploy/argocd/bootstrap/aws-root-application.yaml
+make aws-secrets-status
+```
+
+### 3. Bootstrap the cluster
+
+After the AWS secret values have been populated, run:
+
+```bash
+make aws-bootstrap
+```
+
+The bootstrap target:
+
+```text
+configures the EKS kubectl context
+        ↓
+installs Argo CD
+        ↓
+installs External Secrets Operator
+        ↓
+installs Argo CD Image Updater
+        ↓
+checks the required Secrets Manager values
+        ↓
+creates the Image Updater Git credential if missing
+        ↓
+applies the AWS root Argo CD Application
+```
+
+External Secrets Operator uses the `external-secrets` ServiceAccount because the Terraform-managed Pod Identity association targets that namespace and ServiceAccount.
+
+If the Image Updater Git credential does not already exist, the bootstrap target requests the GitHub PAT interactively with hidden input and creates:
+
+```text
+argocd/image-updater-git-creds
+```
+
+The token is not stored in the Makefile or repository.
+
+Only the AWS Image Updater writes image tags back to:
+
+```text
+deploy/helm/signaldock/values.yaml
+```
+
+Local clusters consume those Git changes but do not perform write-back.
+
+### 4. GitOps reconciliation
+
+The bootstrap target applies:
+
+```text
+deploy/argocd/bootstrap/aws-root-application.yaml
 ```
 
 The root Application then manages:
@@ -138,18 +205,6 @@ The root Application then manages:
 - the AWS External Secrets Application;
 - the SignalDock Helm Application using `values-aws.yaml`;
 - the AWS ImageUpdater custom resource.
-
-Changes to those child manifests are subsequently reconciled directly from Git.
-
-### 6. Verify
-
-```bash
-kubectl get application -n argocd
-kubectl get imageupdater -n argocd
-kubectl get pods -n signaldock
-kubectl get pvc -n signaldock
-kubectl get externalsecret -n signaldock
-```
 
 The expected AWS Applications are:
 
@@ -160,15 +215,134 @@ signaldock-platform-aws
 signaldock-secrets-aws
 ```
 
-They should settle at `Synced` / `Healthy`, and the SignalDock workloads should be `Running`.
+Changes to those child manifests are subsequently reconciled directly from Git.
 
-## Local cluster
+### 5. Verify
 
-The local environment uses the same Helm chart and common `values.yaml`. No local values override is currently needed.
+Run:
 
-A fresh local cluster needs Argo CD and External Secrets Operator installed first. The Image Updater controller is not required locally because AWS is the single Git write-back owner.
+```bash
+make aws-status
+```
 
-Local External Secrets reads from manually created source Secrets in the `shared-secrets` namespace through the Kubernetes provider. Create those source Secrets out of band, then bootstrap the local App of Apps once:
+The status target checks:
+
+```text
+EKS nodes
+Argo CD Applications
+Argo CD Image Updater
+SignalDock Pods
+PersistentVolumeClaims
+PersistentVolumes
+ExternalSecrets
+```
+
+The Applications should settle at `Synced` / `Healthy`, and the SignalDock workloads should be `Running`.
+
+### 6. Destroy the AWS lab
+
+Destroy the complete lab with:
+
+```bash
+make aws-destroy
+```
+
+The command requires explicit confirmation:
+
+```text
+Type DESTROY to continue:
+```
+
+The teardown order is deliberate:
+
+```text
+stop the App of Apps reconciliation
+        ↓
+delete the child GitOps Applications
+        ↓
+delete the SignalDock namespace and PVCs
+        ↓
+wait for the associated PersistentVolumes to disappear
+        ↓
+verify the dynamically provisioned EBS volumes are gone in AWS
+        ↓
+terraform destroy
+```
+
+Before deleting Kubernetes resources, the target records the EBS-backed PersistentVolumes associated with SignalDock PVCs. If those PVs or EBS volumes are still present after the cleanup timeout, the target aborts **before** `terraform destroy` instead of silently leaving dynamic storage behind.
+
+EBS volumes are not force-deleted with the AWS CLI. An unexpected leftover volume is treated as an error that should be inspected rather than hidden by an aggressive cleanup command.
+
+## Local Kubernetes
+
+### Direct Helm deployment
+
+The same chart can be managed directly with the Makefile. When Helm manages the chart directly, the required `signaldock` and `postgres` Kubernetes Secrets must already exist in the `signaldock` namespace.
+
+For a local smoke test, create the namespace and Secrets with your own values:
+
+```bash
+kubectl create namespace signaldock \
+  --dry-run=client \
+  -o yaml \
+  | kubectl apply -f -
+
+kubectl create secret generic postgres \
+  --namespace signaldock \
+  --from-literal=POSTGRES_DB=<database-name> \
+  --from-literal=POSTGRES_USER=<database-username> \
+  --from-literal=POSTGRES_PASSWORD=<database-password>
+
+kubectl create secret generic signaldock \
+  --namespace signaldock \
+  --from-literal=SIGNALDOCK_ADMIN_USERNAME=<admin-username> \
+  --from-literal=SIGNALDOCK_ADMIN_PASSWORD=<admin-password>
+```
+
+Then install and inspect the chart:
+
+```bash
+make helm-up
+make helm-status
+```
+
+Remove the Helm release with:
+
+```bash
+make helm-down
+```
+
+These manually created target Secrets are only for direct Helm management. The GitOps deployment obtains the same target Secrets through External Secrets instead.
+
+### Local GitOps deployment
+
+The local GitOps environment uses the same Helm chart and common `values.yaml`. No local values override is currently needed.
+
+A fresh local GitOps cluster needs Argo CD and External Secrets Operator installed first. Argo CD Image Updater is not required locally because AWS is the single Git write-back owner.
+
+Local External Secrets reads from manually created source Secrets in the `shared-secrets` namespace through the Kubernetes provider. These source Secrets use the same key names as Docker Compose and AWS Secrets Manager, but they are intentionally separate from the target `signaldock` and `postgres` Secrets created by ESO.
+
+For a fresh local GitOps environment, create the source namespace and Secrets with your own values:
+
+```bash
+kubectl create namespace shared-secrets \
+  --dry-run=client \
+  -o yaml \
+  | kubectl apply -f -
+
+kubectl create secret generic postgres-source \
+  --namespace shared-secrets \
+  --from-literal=POSTGRES_DB=<database-name> \
+  --from-literal=POSTGRES_USER=<database-username> \
+  --from-literal=POSTGRES_PASSWORD=<database-password>
+
+kubectl create secret generic signaldock-source \
+  --namespace shared-secrets \
+  --from-literal=SIGNALDOCK_ADMIN_USERNAME=<admin-username> \
+  --from-literal=SIGNALDOCK_ADMIN_PASSWORD=<admin-password>
+```
+
+Then bootstrap the local App of Apps once:
 
 ```bash
 kubectl apply -f deploy/argocd/bootstrap/local-root-application.yaml
