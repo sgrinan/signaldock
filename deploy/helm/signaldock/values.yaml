@@ -1,7 +1,7 @@
 signaldock:
   image:
     repository: "ghcr.io/sgrinan/signaldock"
-    tag: "fc7841904aa2bd4410c2ad117ea532a1656a51b8"
+    tag: "98cf264fa46236e0ecaa946e087de46ec39e70c6"
     pullPolicy: "IfNotPresent"
   resources:
     requests:
