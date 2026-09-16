@@ -10,6 +10,12 @@ signaldock:
     limits:
       cpu: "500m"
       memory: "256Mi"
+  trustProxyHeaders: false
+  ingress:
+    enabled: false
+    className: ""
+    host: ""
+    annotations: {}
 
 postgres:
   image:

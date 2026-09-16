@@ -39,7 +39,7 @@ type handler struct {
 }
 
 // NewHandler returns the HTTP handler for the SignalDock web interface.
-func NewHandler(endpoints endpointService, users userRepository, sessions sessionService, readiness readinessChecker, grafanaURL string, logger *slog.Logger) (http.Handler, error) {
+func NewHandler(endpoints endpointService, users userRepository, sessions sessionService, readiness readinessChecker, grafanaURL string, trustProxyHeadersEnabled bool, logger *slog.Logger) (http.Handler, error) {
 	tmpl, err := template.ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
@@ -93,6 +93,10 @@ func NewHandler(endpoints endpointService, users userRepository, sessions sessio
 	rootMux.Handle("/grafana/", h.requireAuth(grafanaProxy))
 
 	rootMux.Handle("/", securityHeaders(mux))
+
+	if trustProxyHeadersEnabled {
+		return trustProxyHeaders(rootMux), nil
+	}
 
 	return rootMux, nil
 }

@@ -105,3 +105,9 @@ spec:
                 configMapKeyRef:
                   name: signaldock
                   key: SIGNALDOCK_GRAFANA_URL
+
+            - name: SIGNALDOCK_TRUST_PROXY_HEADERS
+              valueFrom:
+                configMapKeyRef:
+                  name: signaldock
+                  key: SIGNALDOCK_TRUST_PROXY_HEADERS

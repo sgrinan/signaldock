@@ -4,8 +4,8 @@ SignalDock uses three management layers. Keeping their responsibilities separate
 
 | Layer | Owns |
 | --- | --- |
-| Terraform | AWS VPC/subnets, EKS cluster and node group, EKS managed add-ons, IAM roles/policies, Pod Identity associations, and AWS Secrets Manager secret containers |
-| Argo CD / GitOps | SignalDock Helm release, ExternalSecret/SecretStore resources, AWS `gp3` StorageClass, and the AWS ImageUpdater custom resource |
+| Terraform | AWS VPC/subnets, EKS cluster and node group, EKS managed add-ons, IAM roles/policies, Pod Identity associations, AWS Load Balancer Controller permissions, and AWS Secrets Manager secret containers |
+| Argo CD / GitOps | SignalDock Helm release, ExternalSecret/SecretStore resources, AWS `gp3` StorageClass, AWS Load Balancer Controller, and the AWS ImageUpdater custom resource |
 | Manual bootstrap | Initial controller installation, secret values, and the Git credential used by Image Updater |
 
 Secret values and Git credentials are intentionally not stored in Git or Terraform state.
@@ -13,6 +13,8 @@ Secret values and Git credentials are intentionally not stored in Git or Terrafo
 ## AWS bootstrap
 
 The versions below are pinned so a new cluster can be reproduced instead of depending on a moving `stable` or `latest` reference.
+
+The AWS Load Balancer Controller is managed by Argo CD and pinned to Helm chart `1.14.0` (controller `v2.14.1`).
 
 ```bash
 export ARGO_CD_VERSION=v3.5.3
@@ -90,6 +92,7 @@ The platform Application adopts and manages the AWS in-cluster resources under `
 
 ```bash
 kubectl apply -f deploy/argocd/aws-platform-application.yaml
+kubectl apply -f deploy/argocd/aws-load-balancer-controller-application.yaml
 kubectl apply -f deploy/argocd/external-secrets-aws-application.yaml
 ```
 
@@ -135,6 +138,7 @@ Only the AWS Image Updater writes image tags back to `deploy/helm/signaldock/val
 
 ```bash
 kubectl get application -n argocd
+kubectl get deployment aws-load-balancer-controller -n kube-system
 kubectl get imageupdater -n argocd
 kubectl get pods -n signaldock
 kubectl get pvc -n signaldock

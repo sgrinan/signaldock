@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -42,6 +43,16 @@ func run(logger *slog.Logger) error {
 	grafanaURL := os.Getenv("SIGNALDOCK_GRAFANA_URL")
 	if grafanaURL == "" {
 		grafanaURL = defaultGrafanaURL
+	}
+
+	trustProxyHeadersEnabled := false
+	if raw := os.Getenv("SIGNALDOCK_TRUST_PROXY_HEADERS"); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return fmt.Errorf("parse SIGNALDOCK_TRUST_PROXY_HEADERS: %w", err)
+		}
+
+		trustProxyHeadersEnabled = parsed
 	}
 
 	databaseURL := os.Getenv("SIGNALDOCK_DATABASE_URL")
@@ -78,7 +89,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	handler, err := web.NewHandler(endpointService, userRepository, sessionService, pool, grafanaURL, logger)
+	handler, err := web.NewHandler(endpointService, userRepository, sessionService, pool, grafanaURL, trustProxyHeadersEnabled, logger)
 	if err != nil {
 		return fmt.Errorf("create HTTP handler: %w", err)
 	}

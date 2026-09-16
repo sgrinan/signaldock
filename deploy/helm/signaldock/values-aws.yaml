@@ -1,3 +1,6 @@
+signaldock:
+  trustProxyHeaders: true
+
 postgres:
   storage:
     storageClass: "gp3"

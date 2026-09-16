@@ -26,7 +26,7 @@ func TestGrafanaProxyRequiresAuth(t *testing.T) {
 		slog.NewTextHandler(io.Discard, nil),
 	)
 
-	handler, err := NewHandler(&fakeEndpointService{}, &fakeUserRepository{}, &fakeSessionService{}, &fakeReadinessChecker{}, grafana.URL, logger)
+	handler, err := NewHandler(&fakeEndpointService{}, &fakeUserRepository{}, &fakeSessionService{}, &fakeReadinessChecker{}, grafana.URL, false, logger)
 	if err != nil {
 		t.Fatalf("NewHandler() error = %v, want nil", err)
 	}
@@ -93,7 +93,7 @@ func TestGrafanaProxyAuthenticated(t *testing.T) {
 		},
 	}
 
-	handler, err := NewHandler(&fakeEndpointService{}, users, sessions, &fakeReadinessChecker{}, grafana.URL, logger)
+	handler, err := NewHandler(&fakeEndpointService{}, users, sessions, &fakeReadinessChecker{}, grafana.URL, false, logger)
 	if err != nil {
 		t.Fatalf("NewHandler() error = %v, want nil", err)
 	}
